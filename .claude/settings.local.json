@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(\"C:\\\\Users\\\\jamie\\\\OneDrive\\\\Desktop\\\\Godot\\\\Godot_v4.5.1-stable_win64.exe\" --path \"C:\\\\Users\\\\jamie\\\\Documents\\\\Repos\\\\TicketPingPong\" --check-only --script res://scripts/arena/arena.gd)",
+      "Bash(\"C:\\\\Users\\\\jamie\\\\OneDrive\\\\Desktop\\\\Godot\\\\Godot_v4.5.1-stable_win64.exe\" --path \"C:\\\\Users\\\\jamie\\\\Documents\\\\Repos\\\\TicketPingPong\" --check-only --script res://scripts/ticket/ticket.gd)",
+      "Bash(\"C:\\\\Users\\\\jamie\\\\OneDrive\\\\Desktop\\\\Godot\\\\Godot_v4.5.1-stable_win64.exe\" --path \"C:\\\\Users\\\\jamie\\\\Documents\\\\Repos\\\\TicketPingPong\" --headless --quit-after 2)",
+      "Bash(\"C:\\\\Program Files\\\\Godot\\\\Godot_v4.5.1-stable_win64.exe\" --headless --quit-after 5)",
+      "Bash(echo:*)",
+      "Bash(godot:*)",
+      "Bash(\"C:\\\\Users\\\\jamie\\\\OneDrive\\\\Desktop\\\\Godot\\\\Godot_v4.5.1-stable_win64.exe\" --path \"C:\\\\Users\\\\jamie\\\\Documents\\\\Repos\\\\TicketPingPong\" --headless --quit-after 3)",
+      "Bash(\"C:\\\\Users\\\\jamie\\\\OneDrive\\\\Desktop\\\\Godot\\\\Godot_v4.5.1-stable_win64.exe\":*)",
+      "Bash(cd:*)",
+      "Bash(cd C:\\\\Users\\\\jamie\\\\Documents\\\\Repos\\\\Misdirect:*)"
+    ]
+  }
+}

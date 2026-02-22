@@ -104,7 +104,7 @@ func _restart_game() -> void:
 
 
 func _quit_game() -> void:
-	get_tree().quit()
+	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 
 func _setup_octagon_walls() -> void:
@@ -324,38 +324,40 @@ func _setup_score_displays() -> void:
 	var center_y: float = ARENA_HEIGHT / 2.0
 	var half_zone: float = ZONE_LENGTH / 2.0
 
-	# Scores float directly inside each department's zone area — no box
-	_create_score_display(
-		DepartmentDataScript.DepartmentType.SERVICE_DESK,
-		Vector2(center_x - 45, WALL_THICKNESS + 3)
-	)
-	_create_score_display(
-		DepartmentDataScript.DepartmentType.INFRASTRUCTURE,
-		Vector2(center_x - 45, ARENA_HEIGHT - ZONE_DEPTH - WALL_THICKNESS + 3)
-	)
-	_create_score_display(
-		DepartmentDataScript.DepartmentType.SECURITY,
-		Vector2(WALL_THICKNESS + 3, center_y - 25)
-	)
-	_create_score_display(
-		DepartmentDataScript.DepartmentType.DEVELOPMENT,
-		Vector2(ARENA_WIDTH - ZONE_DEPTH - WALL_THICKNESS + 3, center_y - 25)
-	)
+	# Zone centres
+	var zone_cy_north: float = WALL_THICKNESS + ZONE_DEPTH / 2.0          # y=40
+	var zone_cy_south: float = ARENA_HEIGHT - WALL_THICKNESS - ZONE_DEPTH / 2.0  # y=680
+	var zone_cx_west: float = WALL_THICKNESS + ZONE_DEPTH / 2.0           # x=40
+	var zone_cx_east: float = ARENA_WIDTH - WALL_THICKNESS - ZONE_DEPTH / 2.0   # x=1240
+
+	# North/South — wide control (80×35) centred on the zone midpoint
+	_create_score_display(DepartmentDataScript.DepartmentType.SERVICE_DESK,
+		Vector2(center_x - 40, zone_cy_north - 17), Vector2(80, 35))
+	_create_score_display(DepartmentDataScript.DepartmentType.INFRASTRUCTURE,
+		Vector2(center_x - 40, zone_cy_south - 17), Vector2(80, 35))
+
+	# East/West — control sized to fill the 60 px zone width, centred vertically
+	var zone_w: float = ZONE_DEPTH - 2.0  # 58 px — 1 px margin each side
+	_create_score_display(DepartmentDataScript.DepartmentType.SECURITY,
+		Vector2(zone_cx_west - zone_w / 2.0, center_y - 17), Vector2(zone_w, 35))
+	_create_score_display(DepartmentDataScript.DepartmentType.DEVELOPMENT,
+		Vector2(zone_cx_east - zone_w / 2.0, center_y - 17), Vector2(zone_w, 35))
 
 
-func _create_score_display(dept_type: int, pos: Vector2) -> void:
+func _create_score_display(dept_type: int, pos: Vector2, ctrl_size: Vector2) -> void:
 	var display = score_display_scene.instantiate()
 	display.set_department(dept_type, dept_type == player_department)
 	display.position = pos
-
 	add_child(display)
+	# Set size AFTER add_child so it overrides the .tscn offset values
+	display.size = ctrl_size
 	score_displays[dept_type] = display
 
 
 func _setup_timer_display() -> void:
 	timer_display = timer_display_scene.instantiate()
-	# Top-right corner — sits inside the dark corner dead zone
-	timer_display.position = Vector2(ARENA_WIDTH - 155, 10)
+	# Centre of arena — positioned so the 150x40 control is centred on screen
+	timer_display.position = Vector2(ARENA_WIDTH / 2.0 - 75, ARENA_HEIGHT / 2.0 - 20)
 	timer_display.round_duration = round_duration
 	timer_display.timer_expired.connect(_on_timer_expired)
 	add_child(timer_display)

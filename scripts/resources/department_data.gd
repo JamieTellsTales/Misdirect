@@ -19,11 +19,11 @@ const DEPARTMENT_COLORS: Dictionary = {
 }
 
 const DEPARTMENT_NAMES: Dictionary = {
-	DepartmentType.SERVICE_DESK: "Service Desk",
-	DepartmentType.INFRASTRUCTURE: "Infrastructure",
-	DepartmentType.SECURITY: "Security",
-	DepartmentType.DEVELOPMENT: "Development",
-	DepartmentType.MANAGEMENT: "Management",
+	DepartmentType.SERVICE_DESK: "Blue",
+	DepartmentType.INFRASTRUCTURE: "Green",
+	DepartmentType.SECURITY: "Red",
+	DepartmentType.DEVELOPMENT: "Yellow",
+	DepartmentType.MANAGEMENT: "Purple",
 }
 
 static func get_color(dept: DepartmentType) -> Color:

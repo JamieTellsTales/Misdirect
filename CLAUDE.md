@@ -1,4 +1,4 @@
-# Helpdesk Pong - Project Guide
+# Misdirect - Project Guide
 
 ## Environment Setup
 
@@ -9,12 +9,12 @@ C:\Users\jamie\OneDrive\Desktop\Godot\Godot_v4.5.1-stable_win64.exe
 
 To run the game:
 ```bash
-"C:\Users\jamie\OneDrive\Desktop\Godot\Godot_v4.5.1-stable_win64.exe" --path "C:\Users\jamie\Documents\Repos\HelpdeskPong"
+"C:\Users\jamie\OneDrive\Desktop\Godot\Godot_v4.5.1-stable_win64.exe" --path "C:\Users\jamie\Documents\Repos\Misdirect"
 ```
 
 ## Project Overview
 
-- **Game**: Helpdesk Pong - a strategic arcade game where IT departments deflect wrong-colour tickets and catch their own
+- **Game**: Misdirect - a strategic arcade game where IT departments deflect wrong-colour tickets and catch their own
 - **Engine Version**: Godot 4.5.1
 - **Primary Language**: GDScript
 - **Project Type**: 2D
@@ -117,7 +117,7 @@ signal department_collapsed(department: Department)
 
 ### Project Structure
 ```
-HelpdeskPong/
+Misdirect/
 ├── scenes/
 │   ├── main_menu.tscn          # Start screen, department select
 │   ├── arena.tscn              # Main gameplay scene

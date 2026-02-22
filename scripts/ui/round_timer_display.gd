@@ -34,33 +34,25 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	var rect := Rect2(Vector2.ZERO, size)
-
-	# Background
-	var bg_color := Color(0.1, 0.1, 0.2, 0.9)
-	if is_warning:
-		var pulse: float = (sin(Time.get_ticks_msec() / 150.0) + 1.0) / 2.0
-		bg_color = bg_color.lerp(Color(0.4, 0.1, 0.1, 0.9), pulse * 0.5)
-	draw_rect(rect, bg_color)
-
-	# Border
-	draw_rect(rect, Color.WHITE, false, 2.0)
-
-	# Time text
 	var font := ThemeDB.fallback_font
 	var minutes: int = int(time_remaining) / 60
 	var seconds: int = int(time_remaining) % 60
 	var time_text: String = "%d:%02d" % [minutes, seconds]
 
 	var font_size: int = 28
-	var text_size := font.get_string_size(time_text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size)
-	var text_pos := Vector2(
-		(size.x - text_size.x) / 2,
-		(size.y + text_size.y) / 2 - 4
-	)
+	var text_size := font.get_string_size(time_text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+	var x: float = (size.x - text_size.x) / 2.0
+	var y: float = (size.y + text_size.y) / 2.0 - 4
 
-	var text_color := Color.WHITE if not is_warning else Color.YELLOW
-	draw_string(font, text_pos, time_text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, text_color)
+	var text_color := Color.WHITE
+	if is_warning:
+		var pulse: float = (sin(Time.get_ticks_msec() / 150.0) + 1.0) / 2.0
+		text_color = Color.WHITE.lerp(Color.YELLOW, pulse)
+
+	# Shadow
+	draw_string(font, Vector2(x + 1, y + 1), time_text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(0, 0, 0, 0.8))
+	# Text
+	draw_string(font, Vector2(x, y), time_text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, text_color)
 
 
 func start_timer() -> void:
