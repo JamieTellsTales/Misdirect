@@ -1,0 +1,18 @@
+# Godot 4 generated files
+.godot/
+
+# Godot import metadata (regenerated on import)
+*.import
+
+# Export presets (may contain signing keys/passwords)
+export_presets.cfg
+
+# Mono/C# build artifacts (not used here but safe to include)
+.mono/
+data_*/
+mono_crash.*.json
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini

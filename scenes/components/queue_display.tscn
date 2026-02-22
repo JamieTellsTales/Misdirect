@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3 uid="uid://cqueuedisplay1"]
+
+[ext_resource type="Script" path="res://scripts/ui/queue_display.gd" id="1_queue"]
+
+[node name="QueueDisplay" type="Control"]
+custom_minimum_size = Vector2(80, 40)
+offset_right = 80.0
+offset_bottom = 40.0
+script = ExtResource("1_queue")

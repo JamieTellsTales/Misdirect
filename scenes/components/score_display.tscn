@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3 uid="uid://cscoredisplay1"]
+
+[ext_resource type="Script" path="res://scripts/ui/score_display.gd" id="1_score"]
+
+[node name="ScoreDisplay" type="Control"]
+custom_minimum_size = Vector2(100, 50)
+offset_right = 100.0
+offset_bottom = 50.0
+script = ExtResource("1_score")

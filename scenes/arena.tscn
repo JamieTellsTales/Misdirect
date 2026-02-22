@@ -1,0 +1,47 @@
+[gd_scene load_steps=3 format=3 uid="uid://bxqz5k2m6grvn"]
+
+[ext_resource type="Script" path="res://scripts/arena/arena.gd" id="1_arena"]
+
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_walls"]
+bounce = 1.0
+friction = 0.0
+
+[node name="Arena" type="Node2D"]
+script = ExtResource("1_arena")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(640, 360)
+
+[node name="Walls" type="Node2D" parent="."]
+
+[node name="TopWall" type="StaticBody2D" parent="Walls"]
+position = Vector2(640, 0)
+physics_material_override = SubResource("PhysicsMaterial_walls")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/TopWall"]
+
+[node name="BottomWall" type="StaticBody2D" parent="Walls"]
+position = Vector2(640, 720)
+physics_material_override = SubResource("PhysicsMaterial_walls")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/BottomWall"]
+
+[node name="LeftWall" type="StaticBody2D" parent="Walls"]
+position = Vector2(0, 360)
+physics_material_override = SubResource("PhysicsMaterial_walls")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/LeftWall"]
+
+[node name="RightWall" type="StaticBody2D" parent="Walls"]
+position = Vector2(1280, 360)
+physics_material_override = SubResource("PhysicsMaterial_walls")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/RightWall"]
+
+[node name="Background" type="ColorRect" parent="."]
+z_index = -1
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 1280.0
+offset_bottom = 720.0
+color = Color(0.1, 0.1, 0.15, 1)
