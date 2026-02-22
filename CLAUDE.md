@@ -15,6 +15,7 @@ To run the game:
 ## Project Overview
 
 - **Game**: Misdirect - a strategic arcade game where IT departments deflect wrong-colour tickets and catch their own
+- **Repository**: https://github.com/JamieTellsTales/Misdirect
 - **Engine Version**: Godot 4.5.1
 - **Primary Language**: GDScript
 - **Project Type**: 2D
