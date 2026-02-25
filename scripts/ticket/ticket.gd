@@ -1,16 +1,16 @@
 extends RigidBody2D
 class_name Ticket
-## Ticket - A bouncing ball that represents a helpdesk ticket
+## Ticket - A bouncing ball in the arena
 
-const DepartmentDataScript = preload("res://scripts/resources/department_data.gd")
+const ColourData = preload("res://scripts/resources/department_data.gd")
 
 signal request_split(ticket: RigidBody2D, count: int)
 
 @export var ticket_color: Color = Color.DODGER_BLUE
 @export var base_speed: float = 300.0
 
-# Department this ticket belongs to
-var department_type: int = DepartmentDataScript.DepartmentType.SERVICE_DESK
+# Colour this ticket belongs to
+var colour_type: int = ColourData.ColourType.BLUE
 
 # Size affects speed and points (0.5 to 2.0 scale)
 var size_scale: float = 1.0
@@ -26,8 +26,11 @@ var wrong_catch_count: int = 0
 var has_blame_stamp: bool = false
 var speed_multiplier: float = 1.0
 
-# For Quick Favor split behavior
-var has_split_on_deflect: bool = false
+# Split control — split children cannot re-split
+var can_split: bool = true
+
+# Cooldown to prevent multiple split signals from one collision
+var split_cooldown: float = 0.0
 
 
 func _ready() -> void:
@@ -35,29 +38,24 @@ func _ready() -> void:
 	_apply_size()
 	queue_redraw()
 
-	# Connect to body collision for split detection
 	body_entered.connect(_on_body_entered)
 	contact_monitor = true
 	max_contacts_reported = 4
 
 
 func set_random_size() -> void:
-	# Random size between 0.5x and 2.0x
 	size_scale = randf_range(0.5, 2.0)
 	_apply_size()
 
 
 func _apply_size() -> void:
-	# Base radius is 16, scale it
 	radius = 16.0 * size_scale
 
-	# Bigger = slower
-	var speed_factor: float = 1.0 / size_scale  # 0.5 size = 2x speed, 2.0 size = 0.5x speed
+	var speed_factor: float = 1.0 / size_scale
 	max_speed = 500.0 * speed_factor
 	min_speed = 150.0 * speed_factor
 	base_speed = 300.0 * speed_factor
 
-	# Bigger = more points (10 to 40 points based on size)
 	point_value = int(10 + (size_scale - 0.5) * 20)
 
 	_update_collision_shape()
@@ -72,8 +70,10 @@ func _update_collision_shape() -> void:
 		col_shape.shape = circle
 
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	_clamp_speed()
+	if split_cooldown > 0:
+		split_cooldown -= delta
 
 
 func _clamp_speed() -> void:
@@ -89,21 +89,23 @@ func _clamp_speed() -> void:
 
 func _on_body_entered(body: Node) -> void:
 	if body.is_in_group("paddles"):
-		# Blend the paddle's movement velocity into the ball so that moving
-		# left/right (or up/down for vertical paddles) visibly steers the ball.
+		# Blend paddle movement into the ball for directional control feel
 		if "velocity" in body:
 			linear_velocity += body.velocity * 0.5
 
+		# Double Rebound power up: split when hitting the player paddle
+		if can_split and split_cooldown <= 0.0 and body.is_in_group("player_paddle"):
+			if GameConfig.selected_power_up == "double_rebound":
+				split_cooldown = 0.5
+				request_split.emit(self, 2)
+
 
 func _draw() -> void:
-	# Draw the ticket as a colored circle
 	draw_circle(Vector2.ZERO, radius, ticket_color)
 
-	# Add border - thicker for large tickets
 	var border_width: float = 2.0 + size_scale
 	draw_arc(Vector2.ZERO, radius, 0, TAU, 32, ticket_color.lightened(0.3), border_width)
 
-	# Draw blame stamp indicator (X mark)
 	if has_blame_stamp:
 		var stamp_color := Color.BLACK
 		stamp_color.a = 0.7
@@ -117,14 +119,14 @@ func set_ticket_color(color: Color) -> void:
 	queue_redraw()
 
 
-func set_department(dept_type: int) -> void:
-	department_type = dept_type
-	ticket_color = DepartmentDataScript.get_color(dept_type)
+func set_colour(ct: int) -> void:
+	colour_type = ct
+	ticket_color = ColourData.get_color(ct)
 	queue_redraw()
 
 
-func matches_department(dept_type: int) -> bool:
-	return department_type == dept_type
+func matches_colour(ct: int) -> bool:
+	return colour_type == ct
 
 
 func get_point_value() -> int:
@@ -147,7 +149,3 @@ func apply_wrong_catch_penalty() -> void:
 
 func get_penalty_level() -> int:
 	return wrong_catch_count
-
-
-func should_split_on_wrong_catch() -> bool:
-	return false  # Simplified - no special types for now

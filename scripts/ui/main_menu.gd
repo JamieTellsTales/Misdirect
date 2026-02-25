@@ -68,7 +68,8 @@ func _handle_click(pos: Vector2) -> void:
 func _activate(index: int) -> void:
 	match index:
 		0:
-			get_tree().change_scene_to_file("res://scenes/arena.tscn")
+			GameConfig.reset()
+			get_tree().change_scene_to_file("res://scenes/pre_game_config.tscn")
 		1:
 			popup_state = 1
 		2:
