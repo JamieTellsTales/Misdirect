@@ -75,10 +75,12 @@ func _handle_ticket(ticket: Node2D) -> void:
 	if is_correct:
 		_flash(Color.GREEN)
 		score_up.emit(colour_type, points)
+		AudioManager.play_correct_catch()
 	else:
 		_flash(Color.RED)
 		score_down.emit(colour_type, points)
 		wrong_catch.emit(ticket, colour_type)
+		AudioManager.play_wrong_catch()
 
 	ticket.queue_free()
 

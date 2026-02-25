@@ -29,7 +29,8 @@ var player_paddle_scene: PackedScene = preload("res://scenes/components/player_p
 var ai_paddle_scene: PackedScene = preload("res://scenes/components/ai_paddle.tscn")
 var score_display_scene: PackedScene = preload("res://scenes/components/score_display.tscn")
 var timer_display_scene: PackedScene = preload("res://scenes/components/round_timer_display.tscn")
-var game_over_scene: PackedScene = preload("res://scenes/game_over.tscn")
+var game_over_scene: PackedScene    = preload("res://scenes/game_over.tscn")
+var pause_menu_scene: PackedScene   = preload("res://scenes/pause_menu.tscn")
 
 var zones: Dictionary = {}         # colour_type int -> ColourZone
 var paddles: Dictionary = {}       # colour_type int -> Paddle
@@ -42,6 +43,7 @@ var spawn_timer: float = 0.0
 var spawn_colour_index: int = 0
 var timer_display: Control = null
 var game_over_screen: Control = null
+var pause_menu: Node2D = null
 var is_game_over: bool = false
 
 # Active colours (the 4 used in arena)
@@ -61,6 +63,7 @@ func _ready() -> void:
 	_setup_score_displays()
 	_setup_timer_display()
 	_setup_game_over_screen()
+	_setup_pause_menu()
 	_start_round()
 
 
@@ -344,6 +347,37 @@ func _setup_game_over_screen() -> void:
 	game_over_screen.restart_requested.connect(_restart_game)
 	game_over_screen.quit_requested.connect(_quit_game)
 	add_child(game_over_screen)
+
+
+func _setup_pause_menu() -> void:
+	pause_menu = pause_menu_scene.instantiate()
+	pause_menu.settings_requested.connect(_on_pause_settings)
+	pause_menu.exit_requested.connect(_on_pause_exit)
+	add_child(pause_menu)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not event.is_action_pressed("ui_cancel"):
+		return
+	if is_game_over:
+		return  # GameOverScreen handles ESC for its own navigation
+	if pause_menu == null:
+		return
+	if pause_menu.is_open:
+		pause_menu.close()
+	else:
+		pause_menu.open()
+	get_viewport().set_input_as_handled()
+
+
+func _on_pause_settings() -> void:
+	## Settings exits to main menu on its own — game state is lost, which
+	## is acceptable since display/audio changes may resize the window.
+	get_tree().change_scene_to_file("res://scenes/settings_screen.tscn")
+
+
+func _on_pause_exit() -> void:
+	_quit_game()
 
 
 func _on_timer_expired() -> void:

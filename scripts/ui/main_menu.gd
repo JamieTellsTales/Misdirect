@@ -22,6 +22,7 @@ var item_rects: Array = []  # Rect2 per menu item for mouse hit-testing
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	AudioManager.play_menu_music()
 
 
 func _process(delta: float) -> void:
