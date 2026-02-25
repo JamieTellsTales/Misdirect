@@ -45,6 +45,7 @@ func show_results(scores: Dictionary, player_ct: int, collapsed_colours: Array) 
 
 	visible = true
 	queue_redraw()
+	AudioManager.play_game_over()
 	get_tree().paused = true
 
 

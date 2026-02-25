@@ -26,6 +26,7 @@ var current_path: String = ""
 # Pre-generated SFX streams — built once at startup to avoid mid-game stutter
 var _correct_stream: AudioStreamWAV
 var _wrong_stream: AudioStreamWAV
+var _game_over_stream: AudioStreamWAV
 
 
 func _ready() -> void:
@@ -42,9 +43,11 @@ func _ready() -> void:
 	add_child(sfx_player)
 
 	# Rising ping — pleasant "correct" sound (500 → 1500 Hz, clean sine)
-	_correct_stream = _generate_sweep(500.0, 1500.0, 0.25, 0.45, false)
+	_correct_stream   = _generate_sweep(500.0, 1500.0, 0.25, 0.45, false)
 	# Descending buzz — harsh "wrong" sound (420 → 120 Hz, + 3rd harmonic)
-	_wrong_stream   = _generate_sweep(420.0, 120.0,  0.35, 0.45, true)
+	_wrong_stream     = _generate_sweep(420.0, 120.0,  0.35, 0.45, true)
+	# Dramatic minor chord stab — game over hit
+	_game_over_stream = _generate_chord_stab()
 
 
 func _ensure_music_bus() -> void:
@@ -99,6 +102,12 @@ func play_wrong_catch() -> void:
 	sfx_player.play()
 
 
+func play_game_over() -> void:
+	## Play the dramatic minor-chord stab on round end.
+	sfx_player.stream = _game_over_stream
+	sfx_player.play()
+
+
 # ── Internal ─────────────────────────────────────────────────────────────────
 
 func _on_music_finished() -> void:
@@ -119,6 +128,43 @@ func _play(path: String) -> void:
 	current_path = path
 	music_player.stream = stream
 	music_player.play()
+
+
+func _generate_chord_stab() -> AudioStreamWAV:
+	## Generate a dramatic F-minor chord stab (F3 + Ab3 + C4) for game over.
+	## Sharp attack, exponential decay, 0.75 s total.
+	var sample_rate: int = 44100
+	var duration: float  = 0.75
+	var num_samples: int = int(sample_rate * duration)
+	var data := PackedByteArray()
+	data.resize(num_samples * 2)
+
+	var freqs: Array  = [174.6, 207.7, 261.6]  # F3, Ab3, C4 — F minor
+	var phases: Array = [0.0,   0.0,   0.0]
+
+	for i in range(num_samples):
+		var t: float = float(i) / float(num_samples)
+		# 5 ms sharp attack then power-curve decay
+		var attack: float   = minf(float(i) / (sample_rate * 0.005), 1.0)
+		var envelope: float = attack * pow(1.0 - t, 1.8)
+
+		var sample: float = 0.0
+		for j in range(freqs.size()):
+			sample  += sin(phases[j])
+			phases[j] += freqs[j] * TAU / float(sample_rate)
+
+		sample = (sample / float(freqs.size())) * 0.5 * envelope
+
+		var value: int = clampi(int(sample * 32767.0), -32768, 32767)
+		data[i * 2]     = value & 0xFF
+		data[i * 2 + 1] = (value >> 8) & 0xFF
+
+	var stream := AudioStreamWAV.new()
+	stream.format   = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = sample_rate
+	stream.stereo   = false
+	stream.data     = data
+	return stream
 
 
 func _generate_sweep(
