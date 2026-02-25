@@ -28,6 +28,7 @@ func _ready() -> void:
 	music_player = AudioStreamPlayer.new()
 	music_player.bus = "Music"
 	add_child(music_player)
+	music_player.finished.connect(_on_music_finished)
 
 
 func _ensure_music_bus() -> void:
@@ -63,6 +64,12 @@ func stop_music() -> void:
 
 # ── Internal ─────────────────────────────────────────────────────────────────
 
+func _on_music_finished() -> void:
+	## Called when the track ends — restart it to loop continuously.
+	if current_path != "":
+		music_player.play()
+
+
 func _play(path: String) -> void:
 	if current_path == path and music_player.playing:
 		return  # Already playing this track — don't restart it
@@ -71,11 +78,6 @@ func _play(path: String) -> void:
 	if stream == null:
 		push_warning("AudioManager: could not load track: " + path)
 		return
-
-	# Ensure the stream loops from start to end regardless of embedded loop points
-	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	stream.loop_begin = 0
-	stream.loop_end = 0  # 0 = loop to end of data
 
 	current_path = path
 	music_player.stream = stream
