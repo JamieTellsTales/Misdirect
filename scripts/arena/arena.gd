@@ -418,8 +418,12 @@ func _spawn_ticket() -> void:
 
 	add_child(ticket)
 
-	# Initial velocity — random direction, speed based on size
-	var vel_angle: float = randf_range(0, TAU)
+	# Aim roughly toward the matching department's zone with a random spread.
+	# This gives each department a fair chance of receiving their own tickets
+	# while keeping trajectories unpredictable enough to require skill.
+	var base_angle: float = _get_zone_direction_angle(dept)
+	var spread: float = PI / 3.0  # ±60 degrees of randomness
+	var vel_angle: float = base_angle + randf_range(-spread, spread)
 	ticket.linear_velocity = Vector2.from_angle(vel_angle) * ticket.base_speed
 
 
@@ -459,6 +463,23 @@ func _draw_octagon_outline() -> void:
 		var color := zone_color if i % 2 == 0 else corner_color_line
 		var width := 2.0 if i % 2 == 0 else 3.0
 		draw_line(start, end, color, width)
+
+
+func _get_zone_direction_angle(dept_type: int) -> float:
+	## Returns the angle (in radians) from the arena centre toward the given
+	## department's zone. Used to bias ticket spawn direction so each colour
+	## heads roughly toward its matching area.
+	match dept_type:
+		DepartmentDataScript.DepartmentType.SERVICE_DESK:
+			return -PI / 2.0  # North (up)
+		DepartmentDataScript.DepartmentType.INFRASTRUCTURE:
+			return PI / 2.0   # South (down)
+		DepartmentDataScript.DepartmentType.SECURITY:
+			return PI          # West (left)
+		DepartmentDataScript.DepartmentType.DEVELOPMENT:
+			return 0.0         # East (right)
+		_:
+			return randf_range(0.0, TAU)  # Fallback: fully random
 
 
 func _draw_corner_regions() -> void:
