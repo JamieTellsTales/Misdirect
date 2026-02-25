@@ -1,33 +1,33 @@
-class_name DepartmentData
+class_name ColourData
 extends RefCounted
-## Department configuration data
+## Colour configuration data for ball zones
 
-enum DepartmentType {
-	SERVICE_DESK,
-	INFRASTRUCTURE,
-	SECURITY,
-	DEVELOPMENT,
-	MANAGEMENT
+enum ColourType {
+	BLUE,
+	GREEN,
+	RED,
+	YELLOW,
+	PURPLE
 }
 
-const DEPARTMENT_COLORS: Dictionary = {
-	DepartmentType.SERVICE_DESK: Color.DODGER_BLUE,
-	DepartmentType.INFRASTRUCTURE: Color.FOREST_GREEN,
-	DepartmentType.SECURITY: Color.CRIMSON,
-	DepartmentType.DEVELOPMENT: Color.GOLD,
-	DepartmentType.MANAGEMENT: Color.MEDIUM_PURPLE,
+const COLOURS: Dictionary = {
+	ColourType.BLUE:   Color.DODGER_BLUE,
+	ColourType.GREEN:  Color.FOREST_GREEN,
+	ColourType.RED:    Color.CRIMSON,
+	ColourType.YELLOW: Color.GOLD,
+	ColourType.PURPLE: Color.MEDIUM_PURPLE,
 }
 
-const DEPARTMENT_NAMES: Dictionary = {
-	DepartmentType.SERVICE_DESK: "Blue",
-	DepartmentType.INFRASTRUCTURE: "Green",
-	DepartmentType.SECURITY: "Red",
-	DepartmentType.DEVELOPMENT: "Yellow",
-	DepartmentType.MANAGEMENT: "Purple",
+const COLOUR_NAMES: Dictionary = {
+	ColourType.BLUE:   "Blue",
+	ColourType.GREEN:  "Green",
+	ColourType.RED:    "Red",
+	ColourType.YELLOW: "Yellow",
+	ColourType.PURPLE: "Purple",
 }
 
-static func get_color(dept: DepartmentType) -> Color:
-	return DEPARTMENT_COLORS.get(dept, Color.WHITE)
+static func get_color(colour: int) -> Color:
+	return COLOURS.get(colour, Color.WHITE)
 
-static func get_department_name(dept: DepartmentType) -> String:
-	return DEPARTMENT_NAMES.get(dept, "Unknown")
+static func get_colour_name(colour: int) -> String:
+	return COLOUR_NAMES.get(colour, "Unknown")

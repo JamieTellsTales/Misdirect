@@ -68,7 +68,8 @@ func _handle_click(pos: Vector2) -> void:
 func _activate(index: int) -> void:
 	match index:
 		0:
-			get_tree().change_scene_to_file("res://scenes/arena.tscn")
+			GameConfig.reset()
+			get_tree().change_scene_to_file("res://scenes/pre_game_config.tscn")
 		1:
 			popup_state = 1
 		2:
@@ -130,7 +131,7 @@ func _draw_title() -> void:
 	draw_string(font, Vector2(cx - title_w / 2.0, 170),
 		title, HORIZONTAL_ALIGNMENT_LEFT, -1, title_size, title_color)
 
-	var sub := "it's never your fault"
+	var sub := "Every deflection is a decision"
 	var sub_size: int = 20
 	var sub_w := font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, sub_size).x
 	draw_string(font, Vector2(cx - sub_w / 2.0, 200),
