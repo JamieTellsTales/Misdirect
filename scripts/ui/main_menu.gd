@@ -14,7 +14,7 @@ const MENU_COLORS: Array = [
 ]
 
 var selected_index: int = 0
-var popup_state: int = 0  # 0 = none, 1 = settings, 2 = achievements
+var popup_state: int = 0  # 0 = none, 2 = achievements
 
 var title_pulse: float = 0.0
 var item_rects: Array = []  # Rect2 per menu item for mouse hit-testing
@@ -72,7 +72,7 @@ func _activate(index: int) -> void:
 			GameConfig.reset()
 			get_tree().change_scene_to_file("res://scenes/pre_game_config.tscn")
 		1:
-			popup_state = 1
+			get_tree().change_scene_to_file("res://scenes/settings_screen.tscn")
 		2:
 			popup_state = 2
 		3:
