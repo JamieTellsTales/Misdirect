@@ -295,8 +295,6 @@ func _draw_row_label(font: Font, text: String, y: float, dimmed: bool = false) -
 
 
 func _draw_resolution_selector(font: Font, y: float, dimmed: bool) -> void:
-	var label: String = SettingsManager.RESOLUTIONS[work["resolution_index"]] as Vector2i
-	# Build label string manually
 	var res: Vector2i = SettingsManager.RESOLUTIONS[work["resolution_index"]]
 	var res_str: String = "%d × %d" % [res.x, res.y]
 
