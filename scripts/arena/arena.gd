@@ -100,7 +100,17 @@ func _end_round() -> void:
 		timer_display.stop_timer()
 
 	var player_score: int = scores.get(player_colour, 0)
-	var result: Dictionary = StatsManager.record_game_end(player_score, session_time)
+
+	# Determine winner (highest score among non-collapsed zones)
+	var best_score: int = -1
+	var winner_ct: int  = -1
+	for ct in scores.keys():
+		if ct not in collapsed_colours and scores[ct] > best_score:
+			best_score = scores[ct]
+			winner_ct  = ct
+	var player_won: bool = (winner_ct == player_colour)
+
+	var result: Dictionary = StatsManager.record_game_end(player_score, session_time, player_won)
 
 	if game_over_screen:
 		game_over_screen.show_results(

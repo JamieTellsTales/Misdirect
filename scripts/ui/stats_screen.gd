@@ -37,7 +37,7 @@ func _draw() -> void:
 
 	# Panel
 	var box_w: float = 560.0
-	var box_h: float = 520.0
+	var box_h: float = 646.0
 	var bx: float    = cx - box_w / 2.0
 	var by: float    = cy - box_h / 2.0
 	draw_rect(Rect2(bx, by, box_w, box_h), Color(0.09, 0.09, 0.15, 1.0))
@@ -60,15 +60,18 @@ func _draw() -> void:
 
 	# Stat rows
 	var rows: Array = [
-		["High Score",         "%d" % StatsManager.high_score,           Color(1.0,  0.84, 0.0,  1.0)],
-		["Total Score",        "%d" % StatsManager.total_score,           Color(0.8,  0.8,  0.9,  1.0)],
-		["Points Available",   "%d" % StatsManager.points,                Color(0.4,  0.9,  0.4,  1.0)],
-		["Games Played",       "%d" % StatsManager.games_played,          Color(0.8,  0.8,  0.9,  1.0)],
-		["Time Played",        StatsManager.format_time(StatsManager.total_time_played), Color(0.8, 0.8, 0.9, 1.0)],
-		["Achievements",       "%d unlocked" % StatsManager.achievements_unlocked,      Color(0.8, 0.8, 0.9, 1.0)],
-		["Powerups",           "%d unlocked" % StatsManager.powerups_unlocked,          Color(0.8, 0.8, 0.9, 1.0)],
-		["Modifiers",          "%d unlocked" % StatsManager.modifiers_unlocked,         Color(0.8, 0.8, 0.9, 1.0)],
-		["Longest Endless",    "— coming soon",                           Color(0.45, 0.45, 0.55, 1.0)],
+		["High Score",         "%d" % StatsManager.high_score,                          Color(1.0,  0.84, 0.0,  1.0)],
+		["Total Score",        "%d" % StatsManager.total_score,                         Color(0.8,  0.8,  0.9,  1.0)],
+		["Points Available",   "%d" % StatsManager.points,                              Color(0.4,  0.9,  0.4,  1.0)],
+		["Games Played",       "%d" % StatsManager.games_played,                        Color(0.8,  0.8,  0.9,  1.0)],
+		["Wins",               "%d" % StatsManager.wins,                                Color(0.4,  0.9,  0.4,  1.0)],
+		["Losses",             "%d" % StatsManager.losses,                              Color(0.9,  0.4,  0.4,  1.0)],
+		["Win / Loss Ratio",   StatsManager.win_loss_ratio(),                           Color(0.8,  0.8,  0.9,  1.0)],
+		["Time Played",        StatsManager.format_time(StatsManager.total_time_played),Color(0.8,  0.8,  0.9,  1.0)],
+		["Achievements",       "%d unlocked" % StatsManager.achievements_unlocked,      Color(0.8,  0.8,  0.9,  1.0)],
+		["Powerups",           "%d unlocked" % StatsManager.powerups_unlocked,          Color(0.8,  0.8,  0.9,  1.0)],
+		["Modifiers",          "%d unlocked" % StatsManager.modifiers_unlocked,         Color(0.8,  0.8,  0.9,  1.0)],
+		["Longest Endless",    "— coming soon",                                         Color(0.45, 0.45, 0.55, 1.0)],
 	]
 
 	var label_size: int  = 20
