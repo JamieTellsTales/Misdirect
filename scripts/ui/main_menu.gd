@@ -5,16 +5,17 @@ class_name MainMenu
 const ARENA_WIDTH: float = 1280.0
 const ARENA_HEIGHT: float = 720.0
 
-const MENU_ITEMS: Array = ["PLAY", "SETTINGS", "ACHIEVEMENTS", "EXIT"]
+const MENU_ITEMS: Array = ["PLAY", "SETTINGS", "STATS", "ACHIEVEMENTS", "EXIT"]
 const MENU_COLORS: Array = [
 	Color.FOREST_GREEN,
 	Color.DODGER_BLUE,
+	Color.CORAL,
 	Color.GOLD,
 	Color.CRIMSON,
 ]
 
 var selected_index: int = 0
-var popup_state: int = 0  # 0 = none, 2 = achievements
+var popup_state: int = 0  # 0 = none, 3 = achievements
 
 var title_pulse: float = 0.0
 var item_rects: Array = []  # Rect2 per menu item for mouse hit-testing
@@ -74,8 +75,10 @@ func _activate(index: int) -> void:
 		1:
 			get_tree().change_scene_to_file("res://scenes/settings_screen.tscn")
 		2:
-			popup_state = 2
+			get_tree().change_scene_to_file("res://scenes/stats_screen.tscn")
 		3:
+			popup_state = 3
+		4:
 			get_tree().quit()
 
 
