@@ -11,6 +11,8 @@ var final_scores: Dictionary = {}
 var winner_colour: int = -1
 var player_colour: int = -1
 var player_collapsed: bool = false
+var points_earned: int = 0
+var is_new_high_score: bool = false
 
 
 func _ready() -> void:
@@ -30,10 +32,18 @@ func _input(event: InputEvent) -> void:
 		quit_requested.emit()
 
 
-func show_results(scores: Dictionary, player_ct: int, collapsed_colours: Array) -> void:
-	final_scores = scores
-	player_colour = player_ct
-	player_collapsed = player_ct in collapsed_colours
+func show_results(
+		scores: Dictionary,
+		player_ct: int,
+		collapsed_colours: Array,
+		earned: int = 0,
+		new_high: bool = false
+) -> void:
+	final_scores      = scores
+	player_colour     = player_ct
+	player_collapsed  = player_ct in collapsed_colours
+	points_earned     = earned
+	is_new_high_score = new_high
 
 	var best_score: int = -1
 	winner_colour = -1
@@ -60,7 +70,7 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, Vector2(1280.0, 720.0)), Color(0, 0, 0, 0.5))
 
 	var box_w: float = 520.0
-	var box_h: float = 300.0
+	var box_h: float = 340.0
 	var box_x: float = center_x - box_w / 2.0
 	var box_y: float = center_y - box_h / 2.0
 	var box_rect := Rect2(box_x, box_y, box_w, box_h)
@@ -108,6 +118,23 @@ func _draw() -> void:
 		draw_string(font, Vector2(center_x - line_w / 2.0, y_pos),
 			line, HORIZONTAL_ALIGNMENT_LEFT, -1, score_size, ct_color)
 		y_pos += 38.0
+
+	# Points earned and new high score indicator
+	var extra_y: float = y_pos + 8.0
+	if is_new_high_score:
+		var hs_text: String = "★  NEW HIGH SCORE!"
+		var hs_size: int    = 18
+		var hs_w := font.get_string_size(hs_text, HORIZONTAL_ALIGNMENT_LEFT, -1, hs_size).x
+		draw_string(font, Vector2(center_x - hs_w / 2.0, extra_y),
+			hs_text, HORIZONTAL_ALIGNMENT_LEFT, -1, hs_size, Color.GOLD)
+		extra_y += 26.0
+
+	if points_earned > 0:
+		var pts_text: String = "+ %d points earned" % points_earned
+		var pts_size: int    = 15
+		var pts_w := font.get_string_size(pts_text, HORIZONTAL_ALIGNMENT_LEFT, -1, pts_size).x
+		draw_string(font, Vector2(center_x - pts_w / 2.0, extra_y),
+			pts_text, HORIZONTAL_ALIGNMENT_LEFT, -1, pts_size, Color(0.55, 0.85, 0.55, 1.0))
 
 	var inst_size: int = 15
 	var inst_text: String = "ENTER — play again     ESC — main menu"

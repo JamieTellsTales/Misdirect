@@ -41,6 +41,7 @@ var player_colour: int = ColourData.ColourType.GREEN  # Player controls bottom z
 
 var spawn_timer: float = 0.0
 var spawn_colour_index: int = 0
+var session_time: float = 0.0   # Seconds of active play (auto-excludes pause time)
 var timer_display: Control = null
 var game_over_screen: Control = null
 var pause_menu: Node2D = null
@@ -71,6 +72,7 @@ func _process(delta: float) -> void:
 	if is_game_over:
 		return
 
+	session_time += delta  # _process doesn't run while paused, so this excludes pause time
 	spawn_timer += delta
 	if spawn_timer >= ticket_spawn_interval:
 		spawn_timer = 0.0
@@ -97,8 +99,17 @@ func _end_round() -> void:
 	if timer_display:
 		timer_display.stop_timer()
 
+	var player_score: int = scores.get(player_colour, 0)
+	var result: Dictionary = StatsManager.record_game_end(player_score, session_time)
+
 	if game_over_screen:
-		game_over_screen.show_results(scores, player_colour, collapsed_colours)
+		game_over_screen.show_results(
+			scores,
+			player_colour,
+			collapsed_colours,
+			result.get("points_earned", 0),
+			result.get("is_new_high_score", false)
+		)
 
 
 func _restart_game() -> void:
