@@ -63,7 +63,7 @@ func show_after_settings() -> void:
 # ── Input ─────────────────────────────────────────────────────────────────────
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not is_open:
+	if not is_open or not is_inside_tree():
 		return
 
 	if event is InputEventMouseMotion:
