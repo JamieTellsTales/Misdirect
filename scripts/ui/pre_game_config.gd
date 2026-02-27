@@ -35,8 +35,11 @@ var play_button_rect: Rect2 = Rect2()
 var back_button_rect: Rect2 = Rect2()
 
 # Mouse state
-var hover_section: String = ""  # "power_up_N", "modifier_N", "play", "back"
+var hover_section: String = ""  # "power_up", "buy", "modifier", "play", "back"
 var hover_index: int = -1
+
+# Buy rects for locked power-ups — populated each draw frame
+var _pu_buy_rects: Array = []  # Array of {rect, id, price, index}
 
 
 func _ready() -> void:
@@ -68,6 +71,13 @@ func _update_hover(pos: Vector2) -> void:
 	hover_section = ""
 	hover_index = -1
 
+	# BUY buttons on locked power-up rows take priority
+	for entry in _pu_buy_rects:
+		if entry.rect.has_point(pos):
+			hover_section = "buy"
+			hover_index = entry.index
+			return
+
 	for i in GameConfig.POWER_UPS.size():
 		var pu: Dictionary = GameConfig.POWER_UPS[i]
 		var row_y: float = power_up_start_y + i * ROW_HEIGHT
@@ -95,6 +105,12 @@ func _update_hover(pos: Vector2) -> void:
 
 
 func _handle_click(pos: Vector2) -> void:
+	# BUY buttons on locked power-ups
+	for entry in _pu_buy_rects:
+		if entry.rect.has_point(pos):
+			StatsManager.unlock_powerup(entry.id, entry.price)
+			return
+
 	# Power up (radio — one at a time, click again to deselect; locked items ignored)
 	for i in GameConfig.POWER_UPS.size():
 		var pu: Dictionary = GameConfig.POWER_UPS[i]
@@ -183,6 +199,7 @@ func _draw_header() -> void:
 func _draw_power_ups() -> void:
 	var font := ThemeDB.fallback_font
 	power_up_start_y = 160.0
+	_pu_buy_rects.clear()
 
 	# Section header
 	_draw_section_header(font, "POWER UP", "select one", power_up_start_y - 30.0)
@@ -193,10 +210,13 @@ func _draw_power_ups() -> void:
 		var is_unlocked: bool = StatsManager.is_powerup_unlocked(pu["id"])
 		var is_selected: bool = GameConfig.selected_power_up == pu["id"]
 		var is_hovered: bool = hover_section == "power_up" and hover_index == i
-		var is_locked: bool  = not is_unlocked
 
-		_draw_radio(Vector2(COL_RADIO, row_y), is_selected, is_hovered, is_locked)
-		_draw_option_text(font, pu["label"], pu["desc"], row_y, is_selected, is_hovered, is_locked)
+		if is_unlocked:
+			_draw_radio(Vector2(COL_RADIO, row_y), is_selected, is_hovered)
+			_draw_option_text(font, pu["label"], pu["desc"], row_y, is_selected, is_hovered)
+		else:
+			_draw_radio(Vector2(COL_RADIO, row_y), false, false, true)
+			_draw_locked_power_up_row(font, pu, row_y, i)
 
 	# Calculate where modifiers section begins
 	modifier_start_y = power_up_start_y + GameConfig.POWER_UPS.size() * ROW_HEIGHT + SECTION_GAP + 40.0
@@ -258,6 +278,49 @@ func _draw_buttons() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, bsz, Color(0.7, 0.7, 0.8, 1.0))
 
 
+func _draw_locked_power_up_row(font: Font, pu: Dictionary, row_y: float, idx: int) -> void:
+	# Dimmed name
+	draw_string(font, Vector2(COL_LABEL, row_y + 7.0), pu["label"],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.35, 0.35, 0.42, 1.0))
+
+	# Price label
+	var can_afford: bool = pu["price"] == 0 or StatsManager.points >= pu["price"]
+	var price_text := "%d pts" % pu["price"]
+	var price_col := Color(0.95, 0.82, 0.3, 1.0) if can_afford else Color(0.5, 0.5, 0.52, 1.0)
+	draw_string(font, Vector2(COL_DESC, row_y + 7.0), price_text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, price_col)
+
+	# BUY button
+	var btn_w := 64.0
+	var btn_h := 26.0
+	var btn_x := COL_DESC + 80.0
+	var btn_y := row_y - 9.0
+	var btn_rect := Rect2(btn_x, btn_y, btn_w, btn_h)
+
+	var is_buy_hovered: bool = hover_section == "buy" and hover_index == idx
+	var btn_bg: Color
+	var btn_text_col: Color
+	if can_afford:
+		btn_bg = Color(0.18, 0.55, 0.22, 1.0) if is_buy_hovered else Color(0.12, 0.38, 0.16, 1.0)
+		btn_text_col = Color.WHITE
+	else:
+		btn_bg = Color(0.14, 0.14, 0.2, 1.0)
+		btn_text_col = Color(0.38, 0.38, 0.44, 1.0)
+
+	draw_rect(btn_rect, btn_bg)
+	var btn_brd := Color(0.3, 0.82, 0.4, 0.85) if can_afford else Color(0.28, 0.28, 0.38, 0.5)
+	draw_rect(btn_rect, btn_brd, false, 1.5)
+
+	var buy_lbl := "BUY"
+	var buy_size := 14
+	var buy_w := font.get_string_size(buy_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, buy_size).x
+	draw_string(font, Vector2(btn_x + (btn_w - buy_w) / 2.0, btn_y + 18.0),
+		buy_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, buy_size, btn_text_col)
+
+	if can_afford:
+		_pu_buy_rects.append({"rect": btn_rect, "id": pu["id"], "price": pu["price"], "index": idx})
+
+
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 func _draw_section_header(font: Font, title: String, subtitle: String, y: float) -> void:
@@ -304,11 +367,9 @@ func _draw_checkbox(center: Vector2, checked: bool, hovered: bool) -> void:
 
 
 func _draw_option_text(font: Font, label: String, desc: String,
-		row_y: float, active: bool, hovered: bool, locked: bool = false) -> void:
+		row_y: float, active: bool, hovered: bool) -> void:
 	var label_col: Color
-	if locked:
-		label_col = Color(0.35, 0.35, 0.42, 1.0)
-	elif active:
+	if active:
 		label_col = Color(1.0, 1.0, 1.0, 1.0)
 	elif hovered:
 		label_col = Color(0.85, 0.85, 0.95, 1.0)
@@ -318,10 +379,6 @@ func _draw_option_text(font: Font, label: String, desc: String,
 	draw_string(font, Vector2(COL_LABEL, row_y + 7.0), label,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, label_col)
 
-	if locked:
-		draw_string(font, Vector2(COL_DESC, row_y + 7.0), "[Purchase in Shop]",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.38, 0.32, 0.48, 1.0))
-	else:
-		var desc_col := Color(0.5, 0.5, 0.62, 1.0) if not active else Color(0.65, 0.75, 0.65, 1.0)
-		draw_string(font, Vector2(COL_DESC, row_y + 7.0), desc,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, desc_col)
+	var desc_col := Color(0.5, 0.5, 0.62, 1.0) if not active else Color(0.65, 0.75, 0.65, 1.0)
+	draw_string(font, Vector2(COL_DESC, row_y + 7.0), desc,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, desc_col)

@@ -5,7 +5,7 @@ class_name MainMenu
 const ARENA_WIDTH: float = 1280.0
 const ARENA_HEIGHT: float = 720.0
 
-const MENU_ITEMS: Array = ["PLAY", "SETTINGS", "STATS", "SHOP", "ACHIEVEMENTS", "EXIT"]
+const MENU_ITEMS: Array = ["PLAY", "SETTINGS", "STATS", "UNLOCKS", "ACHIEVEMENTS", "EXIT"]
 const MENU_COLORS: Array = [
 	Color.FOREST_GREEN,
 	Color.DODGER_BLUE,
@@ -138,11 +138,6 @@ func _draw_title() -> void:
 	draw_string(font, Vector2(cx - title_w / 2.0, 170),
 		title, HORIZONTAL_ALIGNMENT_LEFT, -1, title_size, title_color)
 
-	var sub := "Every deflection is a decision"
-	var sub_size: int = 20
-	var sub_w := font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, sub_size).x
-	draw_string(font, Vector2(cx - sub_w / 2.0, 200),
-		sub, HORIZONTAL_ALIGNMENT_LEFT, -1, sub_size, Color(0.45, 0.45, 0.58, 1.0))
 
 
 func _draw_menu() -> void:
@@ -150,7 +145,7 @@ func _draw_menu() -> void:
 	var cx: float = ARENA_WIDTH / 2.0
 	var item_font_size: int = 36
 	var spacing: float = 68.0
-	var start_y: float = 310.0
+	var start_y: float = 240.0
 
 	item_rects.clear()
 
