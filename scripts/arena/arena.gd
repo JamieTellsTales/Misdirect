@@ -101,6 +101,10 @@ func _end_round() -> void:
 	if timer_display:
 		timer_display.stop_timer()
 
+	# Double the player's score if Speed Ball modifier was active
+	if GameConfig.has_modifier("speed_ball"):
+		scores[player_colour] = scores.get(player_colour, 0) * 2
+
 	var player_score: int = scores.get(player_colour, 0)
 
 	# Determine winner (highest score among non-collapsed zones)
@@ -471,7 +475,9 @@ func _spawn_ticket() -> void:
 		var spread: float = PI / 9.0  # ±20 degrees — stays within zone opening
 		vel_angle = base_angle + randf_range(-spread, spread)
 
-	ticket.linear_velocity = Vector2.from_angle(vel_angle) * ticket.base_speed
+	if GameConfig.has_modifier("speed_ball"):
+		ticket.speed_multiplier = 2.0
+	ticket.linear_velocity = Vector2.from_angle(vel_angle) * ticket.base_speed * ticket.speed_multiplier
 
 
 func _get_zone_direction_angle(ct: int) -> float:

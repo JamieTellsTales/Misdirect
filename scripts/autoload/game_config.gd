@@ -23,6 +23,27 @@ const POWER_UPS: Array = [
 	},
 ]
 
+## Canonical list of all modifiers. Add entries here to extend the pre-game screen.
+## Optional field "unlock_wins" locks the modifier until that many games are won.
+const MODIFIERS: Array = [
+	{
+		"id": "random_directions",
+		"label": "Random Directions",
+		"desc": "Balls fire in random directions instead of toward their zone",
+	},
+	{
+		"id": "rotated_colours",
+		"label": "Rotated Colours",
+		"desc": "Each colour targets the next zone clockwise — nothing goes where you expect",
+	},
+	{
+		"id": "speed_ball",
+		"label": "Speed Ball",
+		"desc": "All balls move at double speed — your final score is doubled to compensate",
+		"unlock_wins": 10,
+	},
+]
+
 var selected_power_up: String = ""  # "", "gravity", "double_rebound"
 var active_modifiers: Array = []    # e.g. ["random_directions", "rotated_colours"]
 

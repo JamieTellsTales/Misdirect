@@ -6,20 +6,6 @@ class_name PreGameConfig
 const ARENA_WIDTH: float = 1280.0
 const ARENA_HEIGHT: float = 720.0
 
-# ── Modifiers ────────────────────────────────────────────────────────────────
-const MODIFIERS: Array = [
-	{
-		"id": "random_directions",
-		"label": "Random Directions",
-		"desc": "Balls fire in random directions instead of toward their zone"
-	},
-	{
-		"id": "rotated_colours",
-		"label": "Rotated Colours",
-		"desc": "Each colour targets the next zone clockwise — nothing goes where you expect"
-	},
-]
-
 # ── Layout ───────────────────────────────────────────────────────────────────
 const COL_LEFT: float = 180.0    # Left margin for option rows
 const COL_RADIO: float = 180.0   # Radio/checkbox circle centre X
@@ -88,12 +74,14 @@ func _update_hover(pos: Vector2) -> void:
 				hover_index = i
 			return
 
-	for i in MODIFIERS.size():
+	for i in GameConfig.MODIFIERS.size():
+		var mod: Dictionary = GameConfig.MODIFIERS[i]
 		var row_y: float = modifier_start_y + i * ROW_HEIGHT
 		var rect := Rect2(COL_RADIO - 16, row_y - 20, ARENA_WIDTH - COL_RADIO - 60, 40)
 		if rect.has_point(pos):
-			hover_section = "modifier"
-			hover_index = i
+			if _is_modifier_unlocked(mod):
+				hover_section = "modifier"
+				hover_index = i
 			return
 
 	if play_button_rect.has_point(pos):
@@ -121,12 +109,14 @@ func _handle_click(pos: Vector2) -> void:
 				GameConfig.set_power_up(pu["id"])
 			return
 
-	# Modifiers (checkbox — toggle)
-	for i in MODIFIERS.size():
+	# Modifiers (checkbox — toggle; locked modifiers are ignored)
+	for i in GameConfig.MODIFIERS.size():
+		var mod: Dictionary = GameConfig.MODIFIERS[i]
 		var row_y: float = modifier_start_y + i * ROW_HEIGHT
 		var rect := Rect2(COL_RADIO - 16, row_y - 20, ARENA_WIDTH - COL_RADIO - 60, 40)
 		if rect.has_point(pos):
-			GameConfig.toggle_modifier(MODIFIERS[i]["id"])
+			if _is_modifier_unlocked(mod):
+				GameConfig.toggle_modifier(mod["id"])
 			return
 
 	if play_button_rect.has_point(pos):
@@ -238,21 +228,25 @@ func _draw_modifiers() -> void:
 
 	_draw_section_header(font, "MODIFIERS", "add as many as you like", modifier_start_y - 30.0)
 
-	for i in MODIFIERS.size():
-		var mod: Dictionary = MODIFIERS[i]
+	for i in GameConfig.MODIFIERS.size():
+		var mod: Dictionary = GameConfig.MODIFIERS[i]
 		var row_y: float = modifier_start_y + i * ROW_HEIGHT
 		var is_active: bool = GameConfig.has_modifier(mod["id"])
 		var is_hovered: bool = hover_section == "modifier" and hover_index == i
 
-		_draw_checkbox(Vector2(COL_RADIO, row_y), is_active, is_hovered)
-		_draw_option_text(font, mod["label"], mod["desc"], row_y, is_active, is_hovered)
+		if _is_modifier_unlocked(mod):
+			_draw_checkbox(Vector2(COL_RADIO, row_y), is_active, is_hovered)
+			_draw_option_text(font, mod["label"], mod["desc"], row_y, is_active, is_hovered)
+		else:
+			_draw_checkbox_locked(Vector2(COL_RADIO, row_y))
+			_draw_locked_modifier_row(font, mod, row_y)
 
 
 func _draw_buttons() -> void:
 	var font := ThemeDB.fallback_font
 	var cx: float = ARENA_WIDTH / 2.0
 
-	var btn_y: float = modifier_start_y + MODIFIERS.size() * ROW_HEIGHT + 50.0
+	var btn_y: float = modifier_start_y + GameConfig.MODIFIERS.size() * ROW_HEIGHT + 50.0
 	var play_w: float = 200.0
 	var play_h: float = 52.0
 	play_button_rect = Rect2(cx - play_w / 2.0, btn_y, play_w, play_h)
@@ -283,6 +277,32 @@ func _draw_buttons() -> void:
 	var bw := font.get_string_size(back_text, HORIZONTAL_ALIGNMENT_LEFT, -1, bsz).x
 	draw_string(font, Vector2(COL_LEFT + (back_w - bw) / 2.0, btn_y + 28.0), back_text,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, bsz, Color(0.7, 0.7, 0.8, 1.0))
+
+
+func _is_modifier_unlocked(mod: Dictionary) -> bool:
+	## Returns true if the modifier has no unlock_wins gate, or the player has enough wins.
+	if not mod.has("unlock_wins"):
+		return true
+	return StatsManager.wins >= mod["unlock_wins"]
+
+
+func _draw_locked_modifier_row(font: Font, mod: Dictionary, row_y: float) -> void:
+	## Renders a locked modifier row: dimmed label + "Unlocks at X wins" hint.
+	draw_string(font, Vector2(COL_LABEL, row_y + 7.0), mod["label"],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.35, 0.35, 0.42, 1.0))
+
+	var req_wins: int = mod.get("unlock_wins", 0)
+	var lock_text := "Unlocks at %d wins  (%d so far)" % [req_wins, StatsManager.wins]
+	draw_string(font, Vector2(COL_DESC, row_y + 7.0), lock_text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.55, 0.48, 0.28, 0.9))
+
+
+func _draw_checkbox_locked(center: Vector2) -> void:
+	## Renders a dimmed, un-interactable checkbox indicating a locked modifier.
+	var box_half: float = 10.0
+	var rect := Rect2(center - Vector2(box_half, box_half), Vector2(box_half * 2, box_half * 2))
+	draw_rect(rect, Color(0.1, 0.1, 0.15, 1.0))
+	draw_rect(rect, Color(0.28, 0.28, 0.35, 0.5), false, 2.0)
 
 
 func _draw_locked_power_up_row(font: Font, pu: Dictionary, row_y: float, idx: int) -> void:

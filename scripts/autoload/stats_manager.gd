@@ -81,8 +81,10 @@ func record_game_end(player_score: int, time_seconds: float, player_won: bool) -
 	if is_new_high_score:
 		high_score = player_score
 
-	# Points = player score for this session (1:1 for now; upgrade economy TBD)
-	var points_earned: int = player_score
+	# Points: 1 per 100 score; halved (integer division) on loss
+	var points_earned: int = player_score / 100
+	if not player_won:
+		points_earned = points_earned / 2
 	points += points_earned
 
 	save_stats()
