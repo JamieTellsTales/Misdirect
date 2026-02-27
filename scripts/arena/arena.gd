@@ -507,6 +507,13 @@ func _get_zone_direction_angle(ct: int) -> float:
 func _on_ticket_split(original: RigidBody2D, count: int) -> void:
 	if not is_instance_valid(original):
 		return
+	# Defer so we never modify physics state mid-query-flush (body_entered callback)
+	call_deferred("_do_ticket_split", original, count)
+
+
+func _do_ticket_split(original: RigidBody2D, count: int) -> void:
+	if not is_instance_valid(original):
+		return
 
 	var pos: Vector2 = original.position
 	var vel: Vector2 = original.linear_velocity
