@@ -74,7 +74,7 @@ func _draw() -> void:
 	draw_rect(Rect2(px, py, panel_w, panel_h), Color(0.55, 0.55, 0.65, 1.0), false, 2.0)
 
 	# Title
-	var title      := "SHOP"
+	var title      := "UNLOCKS"
 	var title_size := 36
 	var title_w    := font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, title_size).x
 	draw_string(font, Vector2(cx - title_w / 2.0 + 2, py + 52.0),

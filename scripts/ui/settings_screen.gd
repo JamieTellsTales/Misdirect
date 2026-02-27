@@ -2,6 +2,12 @@ extends Node2D
 class_name SettingsScreen
 ## Settings screen — fully drawn via _draw() / _input(), no Control nodes.
 ## Changes are previewed live; only committed to disk on "Save & Back".
+## Set return_to_game = true before adding as a child overlay so it emits
+## the `done` signal and queue_frees itself instead of changing scene.
+
+signal done  # Emitted in overlay mode after save or discard
+
+var return_to_game: bool = false  # True when used as in-game overlay
 
 const W: float = 1280.0
 const H: float = 720.0
@@ -48,6 +54,10 @@ var sliders: Dictionary = {}  # name -> Rect2
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	_copy_from_manager()
+	if return_to_game:
+		# Must process while the game tree is paused
+		process_mode = Node.PROCESS_MODE_ALWAYS
+		z_index = 10
 
 
 func _copy_from_manager() -> void:
@@ -149,14 +159,22 @@ func _preview() -> void:
 func _save() -> void:
 	_preview()
 	SettingsManager.save_settings()
-	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+	if return_to_game:
+		done.emit()
+		queue_free()
+	else:
+		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 
 func _discard() -> void:
 	# Restore from disk and re-apply before leaving
 	SettingsManager.load_settings()
 	SettingsManager.apply_settings()
-	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+	if return_to_game:
+		done.emit()
+		queue_free()
+	else:
+		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 
 # ── Drawing ──────────────────────────────────────────────────────────────────
