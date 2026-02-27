@@ -192,6 +192,13 @@ func _draw_header() -> void:
 	draw_string(font, Vector2(cx - sw / 2.0, 100), sub,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, ssz, Color(0.45, 0.45, 0.58, 1.0))
 
+	# Points balance — top-right, above the divider line
+	var pts_text := "%d pts available" % StatsManager.points
+	var pts_sz: int = 16
+	var pts_w := font.get_string_size(pts_text, HORIZONTAL_ALIGNMENT_LEFT, -1, pts_sz).x
+	draw_string(font, Vector2(ARENA_WIDTH - COL_LEFT - pts_w, 98), pts_text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, pts_sz, Color(0.4, 0.9, 0.4, 1.0))
+
 	draw_line(Vector2(COL_LEFT, 115), Vector2(ARENA_WIDTH - COL_LEFT, 115),
 		Color(0.3, 0.3, 0.4, 0.6), 1.0)
 
