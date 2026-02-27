@@ -5,11 +5,12 @@ class_name MainMenu
 const ARENA_WIDTH: float = 1280.0
 const ARENA_HEIGHT: float = 720.0
 
-const MENU_ITEMS: Array = ["PLAY", "SETTINGS", "STATS", "ACHIEVEMENTS", "EXIT"]
+const MENU_ITEMS: Array = ["PLAY", "SETTINGS", "STATS", "SHOP", "ACHIEVEMENTS", "EXIT"]
 const MENU_COLORS: Array = [
 	Color.FOREST_GREEN,
 	Color.DODGER_BLUE,
 	Color.CORAL,
+	Color(0.65, 0.4, 0.9, 1.0),
 	Color.GOLD,
 	Color.CRIMSON,
 ]
@@ -77,8 +78,10 @@ func _activate(index: int) -> void:
 		2:
 			get_tree().change_scene_to_file("res://scenes/stats_screen.tscn")
 		3:
-			popup_state = 3
+			get_tree().change_scene_to_file("res://scenes/shop.tscn")
 		4:
+			popup_state = 4
+		5:
 			get_tree().quit()
 
 

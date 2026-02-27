@@ -18,6 +18,7 @@ var achievements_unlocked:   int   = 0
 var powerups_unlocked:       int   = 0
 var modifiers_unlocked:      int   = 0
 var longest_endless_seconds: float = 0.0   # Populated when endless mode ships
+var unlocked_powerups:       Array = []    # IDs of purchased power-ups
 
 
 func _ready() -> void:
@@ -42,6 +43,7 @@ func load_stats() -> void:
 	powerups_unlocked       = config.get_value("stats", "powerups_unlocked",       0)
 	modifiers_unlocked      = config.get_value("stats", "modifiers_unlocked",      0)
 	longest_endless_seconds = config.get_value("stats", "longest_endless_seconds", 0.0)
+	unlocked_powerups       = config.get_value("stats", "unlocked_powerups",       [])
 
 
 func save_stats() -> void:
@@ -57,6 +59,7 @@ func save_stats() -> void:
 	config.set_value("stats", "powerups_unlocked",       powerups_unlocked)
 	config.set_value("stats", "modifiers_unlocked",      modifiers_unlocked)
 	config.set_value("stats", "longest_endless_seconds", longest_endless_seconds)
+	config.set_value("stats", "unlocked_powerups",       unlocked_powerups)
 	config.save(STATS_PATH)
 
 
@@ -96,6 +99,26 @@ func win_loss_ratio() -> String:
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+func is_powerup_unlocked(id: String) -> bool:
+	## "None" (id == "") is always available; others require purchase.
+	if id == "":
+		return true
+	return id in unlocked_powerups
+
+
+func unlock_powerup(id: String, price: int) -> bool:
+	## Purchase a power-up. Returns true on success, false if already owned or insufficient points.
+	if id == "" or id in unlocked_powerups:
+		return false
+	if points < price:
+		return false
+	points -= price
+	unlocked_powerups.append(id)
+	powerups_unlocked = unlocked_powerups.size()
+	save_stats()
+	return true
+
 
 func format_time(seconds: float) -> String:
 	## Format a duration in seconds as "Xh Ym" or "Xm Ys".
