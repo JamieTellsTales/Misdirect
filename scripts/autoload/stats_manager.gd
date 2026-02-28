@@ -30,9 +30,24 @@ func _ready() -> void:
 # ── Persistence ───────────────────────────────────────────────────────────────
 
 func load_stats() -> void:
+	# Reset to defaults first so switching to a profile with no save file
+	# doesn't leave the previous profile's data in memory.
+	high_score              = 0
+	total_score             = 0
+	points                  = 0
+	games_played            = 0
+	total_time_played       = 0.0
+	wins                    = 0
+	losses                  = 0
+	achievements_unlocked   = 0
+	powerups_unlocked       = 0
+	modifiers_unlocked      = 0
+	longest_endless_seconds = 0.0
+	unlocked_powerups       = []
+
 	var config := ConfigFile.new()
 	if config.load(_stats_path()) != OK:
-		return  # No save file yet — start from defaults
+		return  # No save file yet — defaults are already applied above
 
 	high_score              = config.get_value("stats", "high_score",              0)
 	total_score             = config.get_value("stats", "total_score",             0)
