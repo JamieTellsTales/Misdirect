@@ -45,7 +45,9 @@ var session_time: float = 0.0   # Seconds of active play (auto-excludes pause ti
 var timer_display: Control = null
 var game_over_screen: Control = null
 var pause_menu: Node2D = null
+var settings_overlay: Node2D = null
 var is_game_over: bool = false
+var settings_screen_scene: PackedScene = preload("res://scenes/settings_screen.tscn")
 
 # Active colours (the 4 used in arena)
 var active_colours: Array = [
@@ -98,6 +100,10 @@ func _end_round() -> void:
 	is_game_over = true
 	if timer_display:
 		timer_display.stop_timer()
+
+	# Double the player's score if Speed Ball modifier was active
+	if GameConfig.has_modifier("speed_ball"):
+		scores[player_colour] = scores.get(player_colour, 0) * 2
 
 	var player_score: int = scores.get(player_colour, 0)
 
@@ -382,6 +388,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if is_game_over:
 		return  # GameOverScreen handles ESC for its own navigation
+	if settings_overlay != null:
+		return  # Settings overlay handles its own ESC / discard
 	if pause_menu == null:
 		return
 	if pause_menu.is_open:
@@ -392,9 +400,17 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _on_pause_settings() -> void:
-	## Settings exits to main menu on its own — game state is lost, which
-	## is acceptable since display/audio changes may resize the window.
-	get_tree().change_scene_to_file("res://scenes/settings_screen.tscn")
+	## Overlay the settings screen on top of the paused arena so game state
+	## is preserved. Tree stays paused; settings dismisses itself when done.
+	settings_overlay = settings_screen_scene.instantiate()
+	settings_overlay.return_to_game = true
+	settings_overlay.done.connect(_on_settings_done)
+	add_child(settings_overlay)
+
+
+func _on_settings_done() -> void:
+	settings_overlay = null  # Node freed itself via queue_free()
+	pause_menu.show_after_settings()
 
 
 func _on_pause_exit() -> void:
@@ -459,7 +475,9 @@ func _spawn_ticket() -> void:
 		var spread: float = PI / 9.0  # ±20 degrees — stays within zone opening
 		vel_angle = base_angle + randf_range(-spread, spread)
 
-	ticket.linear_velocity = Vector2.from_angle(vel_angle) * ticket.base_speed
+	if GameConfig.has_modifier("speed_ball"):
+		ticket.speed_multiplier = 2.0
+	ticket.linear_velocity = Vector2.from_angle(vel_angle) * ticket.base_speed * ticket.speed_multiplier
 
 
 func _get_zone_direction_angle(ct: int) -> float:
@@ -487,6 +505,13 @@ func _get_zone_direction_angle(ct: int) -> float:
 
 
 func _on_ticket_split(original: RigidBody2D, count: int) -> void:
+	if not is_instance_valid(original):
+		return
+	# Defer so we never modify physics state mid-query-flush (body_entered callback)
+	call_deferred("_do_ticket_split", original, count)
+
+
+func _do_ticket_split(original: RigidBody2D, count: int) -> void:
 	if not is_instance_valid(original):
 		return
 

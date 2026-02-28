@@ -5,24 +5,33 @@ class_name MainMenu
 const ARENA_WIDTH: float = 1280.0
 const ARENA_HEIGHT: float = 720.0
 
-const MENU_ITEMS: Array = ["PLAY", "SETTINGS", "STATS", "ACHIEVEMENTS", "EXIT"]
+const MENU_ITEMS: Array = ["PLAY", "SETTINGS", "STATS", "UNLOCKS", "ACHIEVEMENTS", "EXIT"]
 const MENU_COLORS: Array = [
 	Color.FOREST_GREEN,
 	Color.DODGER_BLUE,
 	Color.CORAL,
+	Color(0.65, 0.4, 0.9, 1.0),
 	Color.GOLD,
 	Color.CRIMSON,
 ]
 
 var selected_index: int = 0
-var popup_state: int = 0  # 0 = none, 3 = achievements
+var popup_state: int = 0  # 0 = none, 4 = achievements
 
 var title_pulse: float = 0.0
 var item_rects: Array = []  # Rect2 per menu item for mouse hit-testing
 
+# Player badge (bottom-left)
+var _badge_rect:    Rect2 = Rect2()
+var _badge_hovered: bool  = false
+
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	# First-run: if no profiles exist yet, go straight to profile creation
+	if ProfileManager.profiles.is_empty():
+		get_tree().change_scene_to_file("res://scenes/profile_setup.tscn")
+		return
 	AudioManager.play_menu_music()
 
 
@@ -54,6 +63,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _update_hover(pos: Vector2) -> void:
+	_badge_hovered = _badge_rect.has_point(pos)
 	for i in range(item_rects.size()):
 		if item_rects[i].has_point(pos):
 			selected_index = i
@@ -61,6 +71,9 @@ func _update_hover(pos: Vector2) -> void:
 
 
 func _handle_click(pos: Vector2) -> void:
+	if _badge_rect.has_point(pos):
+		get_tree().change_scene_to_file("res://scenes/profile_select.tscn")
+		return
 	for i in range(item_rects.size()):
 		if item_rects[i].has_point(pos):
 			_activate(i)
@@ -77,8 +90,10 @@ func _activate(index: int) -> void:
 		2:
 			get_tree().change_scene_to_file("res://scenes/stats_screen.tscn")
 		3:
-			popup_state = 3
+			get_tree().change_scene_to_file("res://scenes/shop.tscn")
 		4:
+			popup_state = 4
+		5:
 			get_tree().quit()
 
 
@@ -86,6 +101,7 @@ func _draw() -> void:
 	_draw_background()
 	_draw_title()
 	_draw_menu()
+	_draw_profile_badge()
 	if popup_state != 0:
 		_draw_popup()
 
@@ -135,11 +151,6 @@ func _draw_title() -> void:
 	draw_string(font, Vector2(cx - title_w / 2.0, 170),
 		title, HORIZONTAL_ALIGNMENT_LEFT, -1, title_size, title_color)
 
-	var sub := "Every deflection is a decision"
-	var sub_size: int = 20
-	var sub_w := font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, sub_size).x
-	draw_string(font, Vector2(cx - sub_w / 2.0, 200),
-		sub, HORIZONTAL_ALIGNMENT_LEFT, -1, sub_size, Color(0.45, 0.45, 0.58, 1.0))
 
 
 func _draw_menu() -> void:
@@ -147,7 +158,7 @@ func _draw_menu() -> void:
 	var cx: float = ARENA_WIDTH / 2.0
 	var item_font_size: int = 36
 	var spacing: float = 68.0
-	var start_y: float = 310.0
+	var start_y: float = 240.0
 
 	item_rects.clear()
 
@@ -181,6 +192,30 @@ func _draw_menu() -> void:
 	var hint_w := font.get_string_size(hint, HORIZONTAL_ALIGNMENT_LEFT, -1, hint_size).x
 	draw_string(font, Vector2(cx - hint_w / 2.0, ARENA_HEIGHT - 36.0),
 		hint, HORIZONTAL_ALIGNMENT_LEFT, -1, hint_size, Color(0.3, 0.3, 0.38, 1.0))
+
+
+func _draw_profile_badge() -> void:
+	## Draws a small player badge in the bottom-left corner.
+	## Clicking it navigates to the profile selection screen.
+	var font := ThemeDB.fallback_font
+	var name_str: String = ProfileManager.active_name()
+	var label: String = "  " + name_str + "  ▾"
+	var lsz: int = 15
+	var lw: float = font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, lsz).x
+	var pad_x: float = 14.0
+	var badge_w: float = lw + pad_x * 2.0
+	var badge_h: float = 32.0
+	var badge_x: float = 28.0
+	var badge_y: float = ARENA_HEIGHT - 52.0
+	_badge_rect = Rect2(badge_x, badge_y, badge_w, badge_h)
+
+	var bg: Color = Color(0.22, 0.22, 0.32, 1.0) if _badge_hovered else Color(0.13, 0.13, 0.2, 1.0)
+	draw_rect(_badge_rect, bg)
+	draw_rect(_badge_rect, Color(0.45, 0.45, 0.6, 0.75) if _badge_hovered else Color(0.32, 0.32, 0.45, 0.6), false, 1.5)
+
+	draw_string(font, Vector2(badge_x + pad_x, badge_y + 22.0), label,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, lsz,
+		Color(0.9, 0.9, 1.0, 1.0) if _badge_hovered else Color(0.65, 0.65, 0.78, 1.0))
 
 
 func _draw_popup() -> void:

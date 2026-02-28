@@ -47,10 +47,23 @@ func close() -> void:
 	queue_redraw()
 
 
+func hide_for_settings() -> void:
+	## Visually hide the panel without unpausing — settings overlay takes over.
+	## Call close() or show_after_settings() when the overlay finishes.
+	visible = false
+	queue_redraw()
+
+
+func show_after_settings() -> void:
+	## Re-show the panel after the settings overlay is dismissed.
+	visible = true
+	queue_redraw()
+
+
 # ── Input ─────────────────────────────────────────────────────────────────────
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not is_open:
+	if not is_open or not is_inside_tree():
 		return
 
 	if event is InputEventMouseMotion:
@@ -103,7 +116,7 @@ func _activate(index: int) -> void:
 		0:  # Continue
 			close()
 		1:  # Settings
-			close()
+			hide_for_settings()
 			settings_requested.emit()
 		2:  # Achievements — coming soon
 			show_achievements_soon = true
