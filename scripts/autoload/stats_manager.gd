@@ -3,7 +3,9 @@ extends Node
 ## Registered as an autoload. Saves to user://stats.cfg.
 ## Call record_game_end() at the end of each round.
 
-const STATS_PATH := "user://stats.cfg"
+func _stats_path() -> String:
+	## Returns the save path for the active profile's stats file.
+	return ProfileManager.profile_dir(ProfileManager.active_id) + "stats.cfg"
 
 # ── Tracked stats ─────────────────────────────────────────────────────────────
 
@@ -29,7 +31,7 @@ func _ready() -> void:
 
 func load_stats() -> void:
 	var config := ConfigFile.new()
-	if config.load(STATS_PATH) != OK:
+	if config.load(_stats_path()) != OK:
 		return  # No save file yet — start from defaults
 
 	high_score              = config.get_value("stats", "high_score",              0)
@@ -60,7 +62,7 @@ func save_stats() -> void:
 	config.set_value("stats", "modifiers_unlocked",      modifiers_unlocked)
 	config.set_value("stats", "longest_endless_seconds", longest_endless_seconds)
 	config.set_value("stats", "unlocked_powerups",       unlocked_powerups)
-	config.save(STATS_PATH)
+	config.save(_stats_path())
 
 
 # ── Recording ─────────────────────────────────────────────────────────────────
