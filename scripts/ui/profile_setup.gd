@@ -27,6 +27,10 @@ var _name_box_rect: Rect2 = Rect2()
 # Whether we have a back destination (false = first-run, no back option)
 var show_back: bool = false
 
+# Settings overlay — instantiated in place so we return here after closing
+var _settings_overlay: Node2D = null
+var _settings_scene: PackedScene = preload("res://scenes/settings_screen.tscn")
+
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
@@ -43,6 +47,9 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _settings_overlay != null:
+		return  # Settings overlay handles its own input
+
 	if event is InputEventMouseMotion:
 		_update_hover(event.position)
 
@@ -68,7 +75,7 @@ func _handle_click(pos: Vector2) -> void:
 	if _create_rect.has_point(pos) and _name_is_valid():
 		_create_profile()
 	elif _settings_rect.has_point(pos):
-		get_tree().change_scene_to_file("res://scenes/settings_screen.tscn")
+		_open_settings()
 	elif show_back and _back_rect.has_point(pos):
 		get_tree().change_scene_to_file("res://scenes/profile_select.tscn")
 
@@ -116,6 +123,17 @@ func _create_profile() -> void:
 	ProfileManager.create_profile(name_text.strip_edges())
 	StatsManager.load_stats()   # Reload for the new profile
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+
+
+func _open_settings() -> void:
+	_settings_overlay = _settings_scene.instantiate()
+	_settings_overlay.return_to_game = true   # Emit done signal instead of scene-changing
+	_settings_overlay.done.connect(_on_settings_done)
+	add_child(_settings_overlay)
+
+
+func _on_settings_done() -> void:
+	_settings_overlay = null   # Node freed itself via queue_free()
 
 
 # ── Drawing ──────────────────────────────────────────────────────────────────

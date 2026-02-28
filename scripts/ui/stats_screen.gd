@@ -43,18 +43,24 @@ func _draw() -> void:
 	draw_rect(Rect2(bx, by, box_w, box_h), Color(0.09, 0.09, 0.15, 1.0))
 	draw_rect(Rect2(bx, by, box_w, box_h), Color(0.55, 0.55, 0.65, 1.0), false, 2.0)
 
-	# Title
+	# Title + active profile name
 	var title      := "STATISTICS"
 	var title_size := 36
 	var title_w    := font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, title_size).x
-	draw_string(font, Vector2(cx - title_w / 2.0 + 2, by + 52.0),
+	draw_string(font, Vector2(cx - title_w / 2.0 + 2, by + 46.0),
 		title, HORIZONTAL_ALIGNMENT_LEFT, -1, title_size, Color(0, 0, 0, 0.4))
-	draw_string(font, Vector2(cx - title_w / 2.0, by + 50.0),
+	draw_string(font, Vector2(cx - title_w / 2.0, by + 44.0),
 		title, HORIZONTAL_ALIGNMENT_LEFT, -1, title_size, Color.WHITE)
 
+	var profile_label := ProfileManager.active_name()
+	var pl_size := 16
+	var pl_w := font.get_string_size(profile_label, HORIZONTAL_ALIGNMENT_LEFT, -1, pl_size).x
+	draw_string(font, Vector2(cx - pl_w / 2.0, by + 66.0),
+		profile_label, HORIZONTAL_ALIGNMENT_LEFT, -1, pl_size, Color(0.4, 0.75, 0.5, 0.9))
+
 	draw_line(
-		Vector2(bx + 24, by + 62),
-		Vector2(bx + box_w - 24, by + 62),
+		Vector2(bx + 24, by + 76),
+		Vector2(bx + box_w - 24, by + 76),
 		Color(0.4, 0.4, 0.5, 0.7), 1.0
 	)
 
@@ -77,7 +83,7 @@ func _draw() -> void:
 	var label_size: int  = 20
 	var value_size: int  = 20
 	var row_h: float     = 42.0
-	var row_y: float     = by + 88.0
+	var row_y: float     = by + 98.0
 	var label_x: float   = bx + 36.0
 	var value_x: float   = bx + box_w - 36.0  # Right-aligned
 
