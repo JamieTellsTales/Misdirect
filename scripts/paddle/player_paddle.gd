@@ -1,60 +1,33 @@
 extends "res://scripts/paddle/paddle.gd"
 class_name PlayerPaddle
-## Player-controlled paddle with keyboard input and power up support
+## Player-controlled paddle with keyboard input and power-up support.
+## Player is always on the bottom (horizontal) zone, so left/right always maps
+## correctly regardless of the map shape.
 
 @export var move_speed: float = 500.0
 
-var min_pos: float = 0.0
-var max_pos: float = 0.0
-var locked_pos: float = 0.0
-
-# Gravity power up visual
-var gravity_active: bool = false
 const GRAVITY_RANGE: float = 220.0
 const GRAVITY_FORCE: float = 600.0
+var gravity_active: bool = false
 
 
 func _ready() -> void:
 	super._ready()
 	add_to_group("player_paddle")
-	_calculate_movement_bounds()
-	if is_horizontal:
-		locked_pos = position.y
-	else:
-		locked_pos = position.x
-
-
-func _calculate_movement_bounds() -> void:
-	var arena_width: float = 1280.0
-	var arena_height: float = 720.0
-	var zone_length: float = 400.0
-	var half_length: float = paddle_length / 2.0
-	var half_zone: float = zone_length / 2.0
-
-	if is_horizontal:
-		var center_x: float = arena_width / 2.0
-		min_pos = center_x - half_zone + half_length
-		max_pos = center_x + half_zone - half_length
-	else:
-		var center_y: float = arena_height / 2.0
-		min_pos = center_y - half_zone + half_length
-		max_pos = center_y + half_zone - half_length
 
 
 func _physics_process(delta: float) -> void:
 	var input_dir := _get_input_direction()
 
-	if is_horizontal:
-		velocity.x = input_dir * move_speed
-		velocity.y = 0
-	else:
-		velocity.x = 0
-		velocity.y = input_dir * move_speed
-
+	# Move along move_direction (always horizontal for player) with physics velocity
+	# so the CharacterBody2D velocity is correct for deflection response.
+	velocity = move_direction * input_dir * move_speed
 	move_and_slide()
-	_clamp_and_lock_position()
 
-	# Gravity power up: spacebar pulls nearby balls toward this paddle
+	# Snap back onto the constrained axis (move_and_slide can drift).
+	set_slide_offset(get_slide_offset())
+
+	# Gravity power up: hold SPACE to pull nearby balls toward this paddle.
 	if GameConfig.selected_power_up == "gravity":
 		gravity_active = Input.is_action_pressed("power_up")
 		if gravity_active:
@@ -65,29 +38,12 @@ func _physics_process(delta: float) -> void:
 
 
 func _get_input_direction() -> float:
-	var direction: float = 0.0
-
-	if is_horizontal:
-		if Input.is_action_pressed("move_left"):
-			direction -= 1.0
-		if Input.is_action_pressed("move_right"):
-			direction += 1.0
-	else:
-		if Input.is_action_pressed("move_up"):
-			direction -= 1.0
-		if Input.is_action_pressed("move_down"):
-			direction += 1.0
-
-	return direction
-
-
-func _clamp_and_lock_position() -> void:
-	if is_horizontal:
-		position.x = clampf(position.x, min_pos, max_pos)
-		position.y = locked_pos
-	else:
-		position.y = clampf(position.y, min_pos, max_pos)
-		position.x = locked_pos
+	var dir: float = 0.0
+	if Input.is_action_pressed("move_left"):
+		dir -= 1.0
+	if Input.is_action_pressed("move_right"):
+		dir += 1.0
+	return dir
 
 
 func _apply_gravity() -> void:
@@ -99,12 +55,8 @@ func _apply_gravity() -> void:
 
 
 func _draw() -> void:
-	# Draw base paddle
 	super._draw()
-
-	# Gravity power up: show active range when spacebar is held
 	if GameConfig.selected_power_up == "gravity" and gravity_active:
 		var ring_color := Color(paddle_color, 0.35)
 		draw_arc(Vector2.ZERO, GRAVITY_RANGE, 0, TAU, 48, ring_color, 2.0)
-		var glow := Color(paddle_color, 0.15)
-		draw_circle(Vector2.ZERO, GRAVITY_RANGE, glow)
+		draw_circle(Vector2.ZERO, GRAVITY_RANGE, Color(paddle_color, 0.15))

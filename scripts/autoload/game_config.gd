@@ -46,11 +46,45 @@ const MODIFIERS: Array = [
 
 var selected_power_up: String = ""  # "", "gravity", "double_rebound"
 var active_modifiers: Array = []    # e.g. ["random_directions", "rotated_colours"]
+var selected_map: String = "square" # "triangle", "square", "octagon"
+var num_players: int = 4            # Total zones including player
+
+## Which polygon sides are active per (map, player-count). Side 0 = player (bottom).
+## All selections are symmetric around the vertical axis through side 0.
+const MAP_ZONE_SIDES: Dictionary = {
+	"triangle": {
+		2: [0, 1],
+		3: [0, 1, 2],
+	},
+	"square": {
+		2: [0, 2],
+		3: [0, 1, 3],
+		4: [0, 1, 2, 3],
+	},
+	"octagon": {
+		2: [0, 4],
+		3: [0, 3, 5],
+		4: [0, 2, 4, 6],
+		5: [0, 1, 3, 5, 7],
+		6: [0, 1, 3, 4, 5, 7],
+		7: [0, 1, 2, 3, 5, 6, 7],
+		8: [0, 1, 2, 3, 4, 5, 6, 7],
+	},
+}
+
+## Player min/max counts per map shape
+const MAP_PLAYER_LIMITS: Dictionary = {
+	"triangle": {"min": 2, "max": 3},
+	"square":   {"min": 2, "max": 4},
+	"octagon":  {"min": 2, "max": 8},
+}
 
 
 func reset() -> void:
 	selected_power_up = ""
 	active_modifiers = []
+	# selected_map and num_players are intentionally NOT reset here —
+	# they are set by the map select screen and should persist into the arena.
 
 
 func has_modifier(mod: String) -> bool:
