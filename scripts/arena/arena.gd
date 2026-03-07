@@ -119,11 +119,13 @@ func _get_map_vertices(map: String) -> PackedVector2Array:
 				Vector2(60, 660), Vector2(1220, 660), Vector2(640, 60),
 			])
 		"octagon":
+			# Regular octagon: inradius=320, center=(640,360), all edges ≈264px.
+			# Clockwise from the bottom-left vertex of side 0 (player's bottom face).
 			return PackedVector2Array([
-				Vector2(210, 670), Vector2(1070, 670),  # side 0: bottom (player)
-				Vector2(1220, 520), Vector2(1220, 200),  # sides 1-2: right
-				Vector2(1070, 50),  Vector2(210, 50),    # sides 3-4: top
-				Vector2(60, 200),   Vector2(60, 520),    # sides 5-6-7: left
+				Vector2(508, 680), Vector2(772, 680),   # side 0: bottom (player)
+				Vector2(960, 492), Vector2(960, 228),   # sides 1-2: bottom-right, right
+				Vector2(772, 40),  Vector2(508, 40),    # sides 3-4: top-right, top
+				Vector2(320, 228), Vector2(320, 492),   # sides 5-6-7: top-left, left, bottom-left
 			])
 		_:  # "square" and default
 			return PackedVector2Array([
@@ -239,10 +241,11 @@ func _setup_colour_zones() -> void:
 		var edge_mid: Vector2 = (a + b) / 2.0
 		var outward: Vector2  = (edge_mid - centre).normalized()
 		var edge_angle: float = (b - a).angle()
+		var edge_len: float   = (b - a).length()
 
-		# Zone sits just inside the wall
+		# Zone spans the full edge, sitting just inside the wall
 		var zone_pos: Vector2 = edge_mid - outward * (WALL_THICKNESS + ZONE_DEPTH / 2.0)
-		_create_zone(ct, zone_pos, Vector2(ZONE_LENGTH, ZONE_DEPTH), edge_angle)
+		_create_zone(ct, zone_pos, Vector2(edge_len, ZONE_DEPTH), edge_angle)
 
 
 func _create_zone(ct: int, pos: Vector2, size: Vector2, rotation_rad: float) -> void:
@@ -268,8 +271,7 @@ func _create_zone(ct: int, pos: Vector2, size: Vector2, rotation_rad: float) -> 
 func _setup_paddles() -> void:
 	var centre := Vector2(ARENA_WIDTH, ARENA_HEIGHT) / 2.0
 	var n: int = _map_vertices.size()
-	var half_zone:    float = ZONE_LENGTH / 2.0
-	var half_paddle:  float = 50.0  # half of default paddle_length
+	var half_paddle: float = 50.0  # half of default paddle_length
 
 	for ct in active_colours:
 		var side_idx: int = _side_for_colour[ct]
@@ -279,6 +281,8 @@ func _setup_paddles() -> void:
 		var outward: Vector2   = (edge_mid - centre).normalized()
 		var edge_dir: Vector2  = (b - a).normalized()
 		var edge_angle: float  = (b - a).angle()
+		# Paddle travel spans the full edge so it can reach corner to corner
+		var half_zone: float   = (b - a).length() / 2.0
 
 		# Paddle is inward from the wall, past the zone depth
 		var paddle_pos: Vector2 = edge_mid \

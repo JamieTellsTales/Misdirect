@@ -25,23 +25,6 @@ const CARD_CENTRES: Array = [
 const MAP_NAMES: Array = ["TRIANGLE", "SQUARE", "OCTAGON"]
 const MAP_KEYS:  Array = ["triangle", "square", "octagon"]
 
-# Preview polygon vertices relative to card centre (scale to ~180×180 box).
-const PREVIEW_VERTS: Dictionary = {
-	"triangle": [
-		Vector2(0,    -90), Vector2( 90,  72), Vector2(-90,  72),
-	],
-	"square": [
-		Vector2(-78, -72), Vector2( 78, -72),
-		Vector2( 78,  72), Vector2(-78,  72),
-	],
-	"octagon": [
-		Vector2(-40, -78), Vector2( 40, -78),
-		Vector2( 78, -40), Vector2( 78,  40),
-		Vector2( 40,  78), Vector2(-40,  78),
-		Vector2(-78,  40), Vector2(-78, -40),
-	],
-}
-
 # ── State ──────────────────────────────────────────────────────────────────────
 
 var selected_map_index: int = 1   # 0=triangle, 1=square, 2=octagon; default square
@@ -223,7 +206,7 @@ func _draw_cards() -> void:
 		_draw_map_preview(centre + Vector2(0, -20), map_key, i)
 
 		# Label
-		var lbl := MAP_NAMES[i]
+		var lbl: String = MAP_NAMES[i]
 		var lsz: int = 20 if is_selected else 17
 		var lw := font.get_string_size(lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, lsz).x
 		var lc := Color.WHITE if is_selected else Color(0.7, 0.75, 0.9, 1.0)
@@ -239,17 +222,42 @@ func _draw_cards() -> void:
 			Color(0.45, 0.6, 0.85, 0.85) if is_selected else Color(0.4, 0.4, 0.55, 0.7))
 
 
+func _get_preview_verts(map_key: String) -> PackedVector2Array:
+	## Vertices are clockwise starting from the bottom-left of the bottom face (side 0).
+	match map_key:
+		"triangle":
+			# Side 0 = bottom, side 1 = right, side 2 = left
+			return PackedVector2Array([
+				Vector2(-90, 72), Vector2(90, 72), Vector2(0, -90),
+			])
+		"square":
+			# Side 0 = bottom, side 1 = right, side 2 = top, side 3 = left
+			return PackedVector2Array([
+				Vector2(-78, 72),  Vector2(78, 72),
+				Vector2(78, -72),  Vector2(-78, -72),
+			])
+		_:  # octagon — regular, inradius=90, all edges ≈74px
+			# Side 0 = bottom, continuing clockwise
+			return PackedVector2Array([
+				Vector2(-37, 90),  Vector2(37, 90),
+				Vector2(90, 37),   Vector2(90, -37),
+				Vector2(37, -90),  Vector2(-37, -90),
+				Vector2(-90, -37), Vector2(-90, 37),
+			])
+
+
 func _draw_map_preview(centre: Vector2, map_key: String, card_index: int) -> void:
 	## Draws the polygon outline and coloured zone dots for the current player count.
-	var raw_verts: Array = PREVIEW_VERTS[map_key]
-	var n: int = raw_verts.size()
+	var verts: PackedVector2Array = _get_preview_verts(map_key)
+	var n: int = verts.size()
 
-	# Polygon outline
+	# Polygon outline (closed loop)
 	var poly: PackedVector2Array
-	for v in raw_verts:
+	for v in verts:
 		poly.append(centre + v)
-	draw_polyline(PackedVector2Array(poly) + PackedVector2Array([poly[0]]),
-		Color(0.5, 0.55, 0.75, 0.85), 1.5)
+	var outline := poly.duplicate()
+	outline.append(poly[0])
+	draw_polyline(outline, Color(0.5, 0.55, 0.75, 0.85), 1.5)
 
 	# Active zone dots — use the num_players for this card only if it's selected;
 	# for other cards, show their minimum valid count so the preview is always valid.
@@ -266,8 +274,8 @@ func _draw_map_preview(centre: Vector2, map_key: String, card_index: int) -> voi
 	var sides: Array = GameConfig.MAP_ZONE_SIDES[map_key][preview_players]
 	for slot in sides.size():
 		var side_idx: int = sides[slot]
-		var a: Vector2 = centre + raw_verts[side_idx]
-		var b: Vector2 = centre + raw_verts[(side_idx + 1) % n]
+		var a: Vector2 = centre + verts[side_idx]
+		var b: Vector2 = centre + verts[(side_idx + 1) % n]
 		var mid: Vector2 = (a + b) / 2.0
 		var outward: Vector2 = (mid - centre).normalized()
 		var dot_pos: Vector2 = mid - outward * 12.0

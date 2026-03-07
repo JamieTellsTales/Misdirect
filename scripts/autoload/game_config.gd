@@ -53,8 +53,7 @@ var num_players: int = 4            # Total zones including player
 ## All selections are symmetric around the vertical axis through side 0.
 const MAP_ZONE_SIDES: Dictionary = {
 	"triangle": {
-		2: [0, 1],
-		3: [0, 1, 2],
+		3: [0, 1, 2],   # Triangle always uses all 3 sides
 	},
 	"square": {
 		2: [0, 2],
@@ -74,7 +73,7 @@ const MAP_ZONE_SIDES: Dictionary = {
 
 ## Player min/max counts per map shape
 const MAP_PLAYER_LIMITS: Dictionary = {
-	"triangle": {"min": 2, "max": 3},
+	"triangle": {"min": 3, "max": 3},   # Triangle has 3 sides — always 3 zones
 	"square":   {"min": 2, "max": 4},
 	"octagon":  {"min": 2, "max": 8},
 }
