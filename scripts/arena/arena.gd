@@ -239,20 +239,23 @@ func _create_segment_wall(point_a: Vector2, point_b: Vector2) -> void:
 func _setup_colour_zones() -> void:
 	## Zones are placed OUTSIDE the polygon. The wall is absent on zone sides so balls
 	## that get past the paddle exit the polygon and are caught by the outside zone.
-	var centre := Vector2(ARENA_WIDTH, ARENA_HEIGHT) / 2.0
 	var n: int = _map_vertices.size()
 
 	for ct in active_colours:
 		var side_idx: int = _side_for_colour[ct]
 		var a: Vector2 = _map_vertices[side_idx]
 		var b: Vector2 = _map_vertices[(side_idx + 1) % n]
+		var edge_dir: Vector2 = (b - a).normalized()
+		var outward: Vector2  = Vector2(-edge_dir.y, edge_dir.x)  # True edge normal (CCW polygon)
 		var edge_mid: Vector2 = (a + b) / 2.0
-		var outward: Vector2  = (edge_mid - centre).normalized()
-		var edge_angle: float = (b - a).angle()
+		var edge_angle: float = edge_dir.angle()
 		var edge_len: float   = (b - a).length()
 
 		var zone_pos: Vector2 = edge_mid + outward * (ZONE_DEPTH / 2.0)
 		_create_zone(ct, zone_pos, Vector2(edge_len, ZONE_DEPTH), edge_angle)
+		# Parallelogram draw shape: corners at the polygon vertices so adjacent
+		# zones share corners and form a seamless frame (no gaps or overlaps).
+		zones[ct].set_draw_shape(a, b, outward, ZONE_DEPTH)
 
 
 func _create_zone(ct: int, pos: Vector2, size: Vector2, rotation_rad: float) -> void:
@@ -276,7 +279,6 @@ func _create_zone(ct: int, pos: Vector2, size: Vector2, rotation_rad: float) -> 
 # ── Paddle setup ───────────────────────────────────────────────────────────────
 
 func _setup_paddles() -> void:
-	var centre := Vector2(ARENA_WIDTH, ARENA_HEIGHT) / 2.0
 	var n: int = _map_vertices.size()
 	var half_paddle: float = 50.0  # half of default paddle_length
 
@@ -284,10 +286,10 @@ func _setup_paddles() -> void:
 		var side_idx: int = _side_for_colour[ct]
 		var a: Vector2 = _map_vertices[side_idx]
 		var b: Vector2 = _map_vertices[(side_idx + 1) % n]
-		var edge_mid: Vector2  = (a + b) / 2.0
-		var outward: Vector2   = (edge_mid - centre).normalized()
 		var edge_dir: Vector2  = (b - a).normalized()
-		var edge_angle: float  = (b - a).angle()
+		var outward: Vector2   = Vector2(-edge_dir.y, edge_dir.x)  # True edge normal
+		var edge_mid: Vector2  = (a + b) / 2.0
+		var edge_angle: float  = edge_dir.angle()
 		# Paddle travel spans the full edge so it can reach corner to corner
 		var half_zone: float   = (b - a).length() / 2.0
 
@@ -330,14 +332,14 @@ func _create_paddle(
 # ── Score displays ─────────────────────────────────────────────────────────────
 
 func _setup_score_displays() -> void:
-	var centre := Vector2(ARENA_WIDTH, ARENA_HEIGHT) / 2.0
 	var n: int = _map_vertices.size()
 	for ct in active_colours:
 		var side_idx: int = _side_for_colour[ct]
 		var a: Vector2 = _map_vertices[side_idx]
 		var b: Vector2 = _map_vertices[(side_idx + 1) % n]
+		var edge_dir: Vector2 = (b - a).normalized()
+		var outward: Vector2  = Vector2(-edge_dir.y, edge_dir.x)  # True edge normal
 		var edge_mid: Vector2 = (a + b) / 2.0
-		var outward: Vector2  = (edge_mid - centre).normalized()
 		# Place 50px inside the polygon so it's visible behind the paddle
 		var display_pos: Vector2 = edge_mid - outward * 50.0
 		_create_score_display(ct, display_pos - Vector2(40, 17), Vector2(80, 35))

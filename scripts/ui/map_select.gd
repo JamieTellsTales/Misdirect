@@ -277,8 +277,9 @@ func _draw_map_preview(centre: Vector2, map_key: String, card_index: int) -> voi
 		var a: Vector2 = centre + verts[side_idx]
 		var b: Vector2 = centre + verts[(side_idx + 1) % n]
 		var mid: Vector2 = (a + b) / 2.0
-		var outward: Vector2 = (mid - centre).normalized()
-		var dot_pos: Vector2 = mid - outward * 12.0
+		var edge_dir: Vector2 = (b - a).normalized()
+		var outward: Vector2 = Vector2(-edge_dir.y, edge_dir.x)
+		var dot_pos: Vector2 = mid + outward * 12.0
 		var ct: int = _slot_colour(slot)
 		var dot_col: Color = ColourData.get_color(ct)
 		draw_circle(dot_pos, 7.0, Color(dot_col, 0.9))

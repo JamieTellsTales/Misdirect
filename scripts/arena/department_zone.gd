@@ -20,12 +20,30 @@ var flash_timer: float = 0.0
 var flash_color: Color = Color.WHITE
 var is_flashing: bool = false
 
+## Custom parallelogram draw shape in local space.
+## Set by arena.gd via set_draw_shape() so adjacent zones share polygon corner
+## vertices and form a seamless frame. Overrides the default rect draw.
+var draw_vertices: PackedVector2Array = PackedVector2Array()
+
 
 func _ready() -> void:
 	zone_color = ColourData.get_color(colour_type)
 	zone_color.a = 0.3
 
 	body_entered.connect(_on_body_entered)
+	queue_redraw()
+
+
+func set_draw_shape(v_a: Vector2, v_b: Vector2, outward: Vector2, depth: float) -> void:
+	## Build a parallelogram from world-space polygon edge vertices.
+	## v_a, v_b are the two corner vertices of the polygon edge; outward is the
+	## true edge normal pointing away from the polygon interior.
+	draw_vertices = PackedVector2Array([
+		to_local(v_a),
+		to_local(v_b),
+		to_local(v_b + outward * depth),
+		to_local(v_a + outward * depth),
+	])
 	queue_redraw()
 
 
@@ -38,27 +56,34 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	var col_shape := get_node_or_null("CollisionShape2D")
-	if col_shape and col_shape.shape is RectangleShape2D:
-		var shape := col_shape.shape as RectangleShape2D
-		var rect := Rect2(-shape.size / 2, shape.size)
+	var bg_color: Color
+	if is_collapsed:
+		bg_color = Color.DARK_GRAY
+		bg_color.a = 0.5
+	elif is_flashing:
+		var flash_intensity: float = flash_timer / 0.3
+		bg_color = zone_color.lerp(flash_color, flash_intensity * 0.6)
+	else:
+		bg_color = zone_color
 
-		var bg_color: Color
-		if is_collapsed:
-			bg_color = Color.DARK_GRAY
-			bg_color.a = 0.5
-		elif is_flashing:
-			var flash_intensity: float = flash_timer / 0.3
-			bg_color = zone_color.lerp(flash_color, flash_intensity * 0.6)
-		else:
-			bg_color = zone_color
-		draw_rect(rect, bg_color)
+	var border_color: Color = ColourData.get_color(colour_type)
+	if is_collapsed:
+		border_color = Color.DARK_GRAY
+	border_color.a = 0.8
 
-		var border_color: Color = ColourData.get_color(colour_type)
-		if is_collapsed:
-			border_color = Color.DARK_GRAY
-		border_color.a = 0.8
-		draw_rect(rect, border_color, false, 3.0)
+	if draw_vertices.size() >= 4:
+		draw_colored_polygon(draw_vertices, bg_color)
+		var outline := draw_vertices.duplicate()
+		outline.append(draw_vertices[0])
+		draw_polyline(outline, border_color, 3.0)
+	else:
+		# Fallback rect (used before set_draw_shape is called)
+		var col_shape := get_node_or_null("CollisionShape2D")
+		if col_shape and col_shape.shape is RectangleShape2D:
+			var shape := col_shape.shape as RectangleShape2D
+			var rect := Rect2(-shape.size / 2, shape.size)
+			draw_rect(rect, bg_color)
+			draw_rect(rect, border_color, false, 3.0)
 
 
 func _on_body_entered(body: Node2D) -> void:
