@@ -61,7 +61,7 @@ const MAP_ZONE_SIDES: Dictionary = {
 		4: [0, 1, 2, 3],
 	},
 	"pentagon": {
-		3: [0, 2, 4],           # Symmetric: skip 1 and 3
+		3: [0, 2, 3],           # Player bottom, two at top (upper-right + upper-left)
 		5: [0, 1, 2, 3, 4],
 	},
 	"hexagon": {
@@ -71,7 +71,7 @@ const MAP_ZONE_SIDES: Dictionary = {
 	},
 	"heptagon": {
 		3: [0, 2, 5],           # Symmetric: 2 and 5 mirror about vertical axis
-		6: [0, 1, 2, 4, 5, 6],  # Skip side 3 (upper-right near apex)
+		7: [0, 1, 2, 3, 4, 5, 6],
 	},
 	"octagon": {
 		2: [0, 4],
@@ -90,7 +90,7 @@ const MAP_VALID_PLAYERS: Dictionary = {
 	"square":   [2, 3, 4],
 	"pentagon": [3, 5],
 	"hexagon":  [2, 3, 6],
-	"heptagon": [3, 6],
+	"heptagon": [3, 7],
 	"octagon":  [2, 3, 4, 5, 6, 7, 8],
 }
 
