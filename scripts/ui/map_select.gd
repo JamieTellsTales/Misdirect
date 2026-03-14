@@ -231,10 +231,10 @@ func _get_preview_verts(map_key: String) -> PackedVector2Array:
 				Vector2(-94, 72), Vector2(94, 72), Vector2(0, -90),
 			])
 		"square":
-			# Side 0 = bottom, side 1 = right, side 2 = top, side 3 = left
+			# True square: side 0 = bottom, side 1 = right, side 2 = top, side 3 = left
 			return PackedVector2Array([
-				Vector2(-78, 72),  Vector2(78, 72),
-				Vector2(78, -72),  Vector2(-78, -72),
+				Vector2(-72, 72),  Vector2(72, 72),
+				Vector2(72, -72),  Vector2(-72, -72),
 			])
 		_:  # octagon — regular, inradius=90, all edges ≈74px
 			# Side 0 = bottom, continuing clockwise

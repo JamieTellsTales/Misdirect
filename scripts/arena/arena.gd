@@ -129,9 +129,10 @@ func _get_map_vertices(map: String) -> PackedVector2Array:
 				Vector2(320, 228), Vector2(320, 492),   # sides 5-6-7: top-left, left, bottom-left
 			])
 		_:  # "square" and default
+			# True square: all sides = 600px, centred at (640,360)
 			return PackedVector2Array([
-				Vector2(60, 660), Vector2(1220, 660),
-				Vector2(1220, 60), Vector2(60, 60),
+				Vector2(340, 660), Vector2(940, 660),
+				Vector2(940, 60),  Vector2(340, 60),
 			])
 
 
