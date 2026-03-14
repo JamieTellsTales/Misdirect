@@ -58,7 +58,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_handle_click(event.position)
 
 	if event.is_action_pressed("ui_cancel"):
-		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+		get_tree().change_scene_to_file("res://scenes/map_select.tscn")
 
 	if event.is_action_pressed("ui_accept"):
 		_start_game()
@@ -134,7 +134,7 @@ func _handle_click(pos: Vector2) -> void:
 		_start_game()
 
 	if back_button_rect.has_point(pos):
-		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+		get_tree().change_scene_to_file("res://scenes/map_select.tscn")
 
 
 func _start_game() -> void:

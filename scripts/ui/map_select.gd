@@ -377,7 +377,7 @@ func _draw_player_count_row() -> void:
 			if slot == 0:
 				var you_lbl := "YOU"
 				var yw := font.get_string_size(you_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
-				draw_string(font, Vector2(dot_x - yw / 2.0, dot_row_y + 28.0),
+				draw_string(font, Vector2(dot_x - yw / 2.0, dot_row_y + 36.0),
 					you_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(col, 0.9))
 	else:
 		# Show a subtle "not supported" hint
