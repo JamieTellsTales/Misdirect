@@ -284,6 +284,11 @@ func _setup_paddles() -> void:
 	var n: int = _map_vertices.size()
 	var half_paddle: float = 50.0  # half of default paddle_length
 
+	# Build set of side indices that have active zones, for corner checks.
+	var active_sides: Array = []
+	for ct in active_colours:
+		active_sides.append(_side_for_colour[ct])
+
 	for ct in active_colours:
 		var side_idx: int = _side_for_colour[ct]
 		var a: Vector2 = _map_vertices[side_idx]
@@ -292,15 +297,26 @@ func _setup_paddles() -> void:
 		var outward: Vector2   = Vector2(-edge_dir.y, edge_dir.x)  # True edge normal
 		var edge_mid: Vector2  = (a + b) / 2.0
 		var edge_angle: float  = edge_dir.angle()
-		# Paddle travel spans the full edge so it can reach corner to corner
 		var half_zone: float   = (b - a).length() / 2.0
+
+		# At corners shared with a neighbouring active zone, pull the paddle's
+		# travel limit back by half_paddle so it stays within its own zone and
+		# doesn't physically enter the adjacent zone's territory.
+		var prev_side: int = (side_idx - 1 + n) % n
+		var next_side: int = (side_idx + 1) % n
+		var min_off: float = -(half_zone - half_paddle)
+		var max_off: float =   half_zone - half_paddle
+		if prev_side in active_sides:
+			min_off += half_paddle
+		if next_side in active_sides:
+			max_off -= half_paddle
 
 		# Paddle sits just inside the polygon edge, guarding the open zone side
 		var paddle_pos: Vector2 = edge_mid \
 			- outward * (PADDLE_THICKNESS / 2.0 + 5.0)
 
 		_create_paddle(ct, paddle_pos, edge_dir, outward, edge_angle,
-			half_zone, half_paddle)
+			min_off, max_off)
 
 
 func _create_paddle(
@@ -309,8 +325,8 @@ func _create_paddle(
 		move_dir: Vector2,
 		outward: Vector2,
 		rotation_rad: float,
-		half_zone: float,
-		half_paddle: float
+		min_off: float,
+		max_off: float
 ) -> void:
 	var paddle: CharacterBody2D
 	if ct == player_colour:
@@ -318,14 +334,14 @@ func _create_paddle(
 	else:
 		paddle = ai_paddle_scene.instantiate()
 
-	paddle.colour_type   = ct
+	paddle.colour_type    = ct
 	paddle.move_direction = move_dir
-	paddle.outward_dir   = outward
-	paddle.zone_centre   = pos
-	paddle.min_offset    = -(half_zone - half_paddle)
-	paddle.max_offset    =  (half_zone - half_paddle)
-	paddle.position      = pos
-	paddle.rotation      = rotation_rad
+	paddle.outward_dir    = outward
+	paddle.zone_centre    = pos
+	paddle.min_offset     = min_off
+	paddle.max_offset     = max_off
+	paddle.position       = pos
+	paddle.rotation       = rotation_rad
 
 	add_child(paddle)
 	paddles[ct] = paddle
