@@ -113,19 +113,28 @@ func _draw() -> void:
 	sorted_colours.sort_custom(func(a, b): return final_scores[a] > final_scores[b])
 
 	var score_size: int = 22
+	var label_x: float = box_x + 24.0
+	var value_x: float = box_x + box_w - 24.0
 	var y_pos: float = box_y + 90.0
 	for ct in sorted_colours:
 		var ct_color: Color = ColourData.get_color(ct)
 		var score_val: int = final_scores[ct]
-		var line: String = "%s:  %d" % [ColourData.get_colour_name(ct), score_val]
-		if ct == winner_colour:
-			line += "  ★"
-		if ct == player_colour:
-			line += "  (You)"
 
-		var line_w := font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, score_size).x
-		draw_string(font, Vector2(center_x - line_w / 2.0, y_pos),
-			line, HORIZONTAL_ALIGNMENT_LEFT, -1, score_size, ct_color)
+		# Left: colour name with markers
+		var label: String = ColourData.get_colour_name(ct)
+		if ct == winner_colour:
+			label += "  ★"
+		if ct == player_colour:
+			label += "  (You)"
+		draw_string(font, Vector2(label_x, y_pos),
+			label, HORIZONTAL_ALIGNMENT_LEFT, -1, score_size, ct_color)
+
+		# Right: score, right-aligned
+		var val_str: String = "%d" % score_val
+		var val_w := font.get_string_size(val_str, HORIZONTAL_ALIGNMENT_LEFT, -1, score_size).x
+		draw_string(font, Vector2(value_x - val_w, y_pos),
+			val_str, HORIZONTAL_ALIGNMENT_LEFT, -1, score_size, ct_color)
+
 		y_pos += 38.0
 
 	# Points earned and new high score indicator
