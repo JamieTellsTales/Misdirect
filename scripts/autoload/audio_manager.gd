@@ -19,7 +19,8 @@ const GAME_TRACKS: Array = [
 	"res://assets/audio/Action & Dramatic Theme #10 (looped).wav",
 ]
 
-const FADE_DURATION: float = 0.6   # seconds for crossfade
+const FADE_IN_DURATION:  float = 0.3   # seconds to fade a new track in
+const FADE_OUT_DURATION: float = 1.2   # seconds to fade the old track out
 
 # Two players for crossfading — one fades out while the other fades in.
 var _player_a: AudioStreamPlayer
@@ -110,8 +111,8 @@ func stop_music() -> void:
 	current_path = ""
 	_kill_tween(_tween_a)
 	_kill_tween(_tween_b)
-	_tween_a = _tween_to(_player_a, -80.0, func() -> void: _player_a.stop())
-	_tween_b = _tween_to(_player_b, -80.0, func() -> void: _player_b.stop())
+	_tween_a = _tween_to(_player_a, -80.0, FADE_OUT_DURATION, func() -> void: _player_a.stop())
+	_tween_b = _tween_to(_player_b, -80.0, FADE_OUT_DURATION, func() -> void: _player_b.stop())
 
 
 func play_correct_catch() -> void:
@@ -164,8 +165,8 @@ func _play(path: String) -> void:
 	_kill_tween(_tween_a if fading_out == _player_a else _tween_b)
 	_kill_tween(_tween_a if fading_in  == _player_a else _tween_b)
 
-	var t_out: Tween = _tween_to(fading_out, -80.0, func() -> void: fading_out.stop())
-	var t_in:  Tween = _tween_to(fading_in,    0.0)
+	var t_out: Tween = _tween_to(fading_out, -80.0, FADE_OUT_DURATION, func() -> void: fading_out.stop())
+	var t_in:  Tween = _tween_to(fading_in,    0.0, FADE_IN_DURATION)
 
 	if fading_out == _player_a:
 		_tween_a = t_out;  _tween_b = t_in
@@ -177,10 +178,10 @@ func _play(path: String) -> void:
 	_inactive = fading_out
 
 
-func _tween_to(player: AudioStreamPlayer, target_db: float,
+func _tween_to(player: AudioStreamPlayer, target_db: float, duration: float,
 		on_done: Callable = Callable()) -> Tween:
 	var t: Tween = create_tween()
-	t.tween_property(player, "volume_db", target_db, FADE_DURATION)
+	t.tween_property(player, "volume_db", target_db, duration)
 	if on_done.is_valid():
 		t.tween_callback(on_done)
 	return t
