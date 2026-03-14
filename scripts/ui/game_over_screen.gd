@@ -70,7 +70,16 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, Vector2(1280.0, 720.0)), Color(0, 0, 0, 0.5))
 
 	var box_w: float = 520.0
-	var box_h: float = 340.0
+	# Height grows with the number of score rows so all colours always fit.
+	var n: int = final_scores.size()
+	var box_h: float = 90.0              # header (title + divider + padding to first row)
+	box_h += float(n) * 38.0            # score rows
+	box_h += 8.0                        # gap between scores and extras
+	if is_new_high_score:
+		box_h += 26.0
+	if points_earned > 0:
+		box_h += 22.0
+	box_h += 50.0                       # gap before instructions + instructions area
 	var box_x: float = center_x - box_w / 2.0
 	var box_y: float = center_y - box_h / 2.0
 	var box_rect := Rect2(box_x, box_y, box_w, box_h)
