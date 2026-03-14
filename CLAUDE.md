@@ -190,10 +190,8 @@ Misdirect/
 ```
 
 ### Git Workflow
-- Create feature branches: `feature/feature-name`
+- Commit directly to `main`
 - Use conventional commits: `feat:`, `fix:`, `refactor:`
-- Create PRs, then merge when ready
-- Always pull main after merging
 
 ### Build Priority Order
 Build in this order to keep a playable state at all times:
