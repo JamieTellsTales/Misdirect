@@ -226,9 +226,9 @@ func _get_preview_verts(map_key: String) -> PackedVector2Array:
 	## Vertices are clockwise starting from the bottom-left of the bottom face (side 0).
 	match map_key:
 		"triangle":
-			# Side 0 = bottom, side 1 = right, side 2 = left
+			# Equilateral: h=162, s≈187, side 0 = bottom, side 1 = right, side 2 = left
 			return PackedVector2Array([
-				Vector2(-90, 72), Vector2(90, 72), Vector2(0, -90),
+				Vector2(-94, 72), Vector2(94, 72), Vector2(0, -90),
 			])
 		"square":
 			# Side 0 = bottom, side 1 = right, side 2 = top, side 3 = left

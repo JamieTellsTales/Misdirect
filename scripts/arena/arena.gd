@@ -115,8 +115,9 @@ func _get_map_vertices(map: String) -> PackedVector2Array:
 	## Returns polygon vertices clockwise starting from bottom-left of player's edge (side 0).
 	match map:
 		"triangle":
+			# Equilateral: h=600, s≈693, centred at x=640, y=60–660
 			return PackedVector2Array([
-				Vector2(60, 660), Vector2(1220, 660), Vector2(640, 60),
+				Vector2(294, 660), Vector2(986, 660), Vector2(640, 60),
 			])
 		"octagon":
 			# Regular octagon: inradius=320, center=(640,360), all edges ≈264px.
