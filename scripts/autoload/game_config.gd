@@ -46,19 +46,32 @@ const MODIFIERS: Array = [
 
 var selected_power_up: String = ""  # "", "gravity", "double_rebound"
 var active_modifiers: Array = []    # e.g. ["random_directions", "rotated_colours"]
-var selected_map: String = "square" # "triangle", "square", "octagon"
+var selected_map: String = "square"
 var num_players: int = 4            # Total zones including player
 
 ## Which polygon sides are active per (map, player-count). Side 0 = player (bottom).
-## All selections are symmetric around the vertical axis through side 0.
+## All selections are symmetric around the vertical axis through side 0 where possible.
 const MAP_ZONE_SIDES: Dictionary = {
 	"triangle": {
-		3: [0, 1, 2],   # Triangle always uses all 3 sides
+		3: [0, 1, 2],
 	},
 	"square": {
 		2: [0, 2],
 		3: [0, 1, 3],
 		4: [0, 1, 2, 3],
+	},
+	"pentagon": {
+		3: [0, 2, 4],           # Symmetric: skip 1 and 3
+		5: [0, 1, 2, 3, 4],
+	},
+	"hexagon": {
+		2: [0, 3],              # Opposite sides
+		3: [0, 2, 4],           # Alternating
+		6: [0, 1, 2, 3, 4, 5],
+	},
+	"heptagon": {
+		3: [0, 2, 5],           # Symmetric: 2 and 5 mirror about vertical axis
+		6: [0, 1, 2, 4, 5, 6],  # Skip side 3 (upper-right near apex)
 	},
 	"octagon": {
 		2: [0, 4],
@@ -71,11 +84,14 @@ const MAP_ZONE_SIDES: Dictionary = {
 	},
 }
 
-## Player min/max counts per map shape
-const MAP_PLAYER_LIMITS: Dictionary = {
-	"triangle": {"min": 3, "max": 3},   # Triangle has 3 sides — always 3 zones
-	"square":   {"min": 2, "max": 4},
-	"octagon":  {"min": 2, "max": 8},
+## Valid player counts per map. Arrows on the map select screen step through these only.
+const MAP_VALID_PLAYERS: Dictionary = {
+	"triangle": [3],
+	"square":   [2, 3, 4],
+	"pentagon": [3, 5],
+	"hexagon":  [2, 3, 6],
+	"heptagon": [3, 6],
+	"octagon":  [2, 3, 4, 5, 6, 7, 8],
 }
 
 

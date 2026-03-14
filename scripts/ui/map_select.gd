@@ -10,20 +10,24 @@ const ARENA_HEIGHT: float = 720.0
 
 # ── Layout constants ───────────────────────────────────────────────────────────
 
-const CARD_W:   float = 320.0
-const CARD_H:   float = 320.0
-const CARD_GAP: float = 40.0
-const CARD_Y:   float = 100.0  # Top of cards
+const CARD_W:       float = 260.0
+const CARD_H:       float = 200.0
+const CARD_COL_GAP: float = 20.0   # horizontal gap between columns
+const CARD_ROW_GAP: float = 15.0   # vertical gap between rows
+const CARDS_TOP_Y:  float = 90.0
 
-# Card centres (horizontal layout)
+# 6 cards in a 2×3 grid (row 1: triangle/square/pentagon, row 2: hexagon/heptagon/octagon)
 const CARD_CENTRES: Array = [
-	Vector2(1280.0 / 2.0 - CARD_W - CARD_GAP, CARD_Y + CARD_H / 2.0),   # triangle
-	Vector2(1280.0 / 2.0,                       CARD_Y + CARD_H / 2.0),   # square
-	Vector2(1280.0 / 2.0 + CARD_W + CARD_GAP,  CARD_Y + CARD_H / 2.0),   # octagon
+	Vector2(1280.0 / 2.0 - CARD_W - CARD_COL_GAP, CARDS_TOP_Y + CARD_H / 2.0),
+	Vector2(1280.0 / 2.0,                           CARDS_TOP_Y + CARD_H / 2.0),
+	Vector2(1280.0 / 2.0 + CARD_W + CARD_COL_GAP,  CARDS_TOP_Y + CARD_H / 2.0),
+	Vector2(1280.0 / 2.0 - CARD_W - CARD_COL_GAP,  CARDS_TOP_Y + CARD_H + CARD_ROW_GAP + CARD_H / 2.0),
+	Vector2(1280.0 / 2.0,                            CARDS_TOP_Y + CARD_H + CARD_ROW_GAP + CARD_H / 2.0),
+	Vector2(1280.0 / 2.0 + CARD_W + CARD_COL_GAP,   CARDS_TOP_Y + CARD_H + CARD_ROW_GAP + CARD_H / 2.0),
 ]
 
-const MAP_NAMES: Array = ["TRIANGLE", "SQUARE", "OCTAGON"]
-const MAP_KEYS:  Array = ["triangle", "square", "octagon"]
+const MAP_NAMES: Array = ["TRIANGLE", "SQUARE", "PENTAGON", "HEXAGON", "HEPTAGON", "OCTAGON"]
+const MAP_KEYS:  Array = ["triangle", "square", "pentagon", "hexagon", "heptagon", "octagon"]
 
 # ── State ──────────────────────────────────────────────────────────────────────
 
@@ -93,13 +97,17 @@ func _handle_click(pos: Vector2) -> void:
 			return
 
 	if _arrow_left_rect.has_point(pos):
-		var limits: Dictionary = _current_limits()
-		num_players = max(limits["min"], num_players - 1)
+		var valid: Array = _current_valid_players()
+		var idx: int = valid.find(num_players)
+		if idx > 0:
+			num_players = valid[idx - 1]
 		return
 
 	if _arrow_right_rect.has_point(pos):
-		var limits: Dictionary = _current_limits()
-		num_players = min(limits["max"], num_players + 1)
+		var valid: Array = _current_valid_players()
+		var idx: int = valid.find(num_players)
+		if idx >= 0 and idx < valid.size() - 1:
+			num_players = valid[idx + 1]
 		return
 
 	if _next_rect.has_point(pos):
@@ -114,12 +122,19 @@ func _handle_click(pos: Vector2) -> void:
 
 
 func _clamp_players() -> void:
-	var limits := _current_limits()
-	num_players = clamp(num_players, limits["min"], limits["max"])
+	var valid: Array = _current_valid_players()
+	if valid.has(num_players):
+		return
+	# Snap to the nearest valid count.
+	var best: int = valid[0]
+	for v: int in valid:
+		if abs(v - num_players) < abs(best - num_players):
+			best = v
+	num_players = best
 
 
-func _current_limits() -> Dictionary:
-	return GameConfig.MAP_PLAYER_LIMITS[MAP_KEYS[selected_map_index]]
+func _current_valid_players() -> Array:
+	return GameConfig.MAP_VALID_PLAYERS[MAP_KEYS[selected_map_index]]
 
 
 # ── Drawing ────────────────────────────────────────────────────────────────────
@@ -172,7 +187,7 @@ func _draw_cards() -> void:
 	var font := ThemeDB.fallback_font
 	_card_rects.clear()
 
-	for i in 3:
+	for i in 6:
 		var centre: Vector2 = CARD_CENTRES[i]
 		var rect := Rect2(centre - Vector2(CARD_W / 2.0, CARD_H / 2.0),
 			Vector2(CARD_W, CARD_H))
@@ -213,31 +228,65 @@ func _draw_cards() -> void:
 		draw_string(font, Vector2(centre.x - lw / 2.0, rect.position.y + CARD_H - 18.0),
 			lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, lsz, lc)
 
-		# Player count range hint
-		var limits: Dictionary = GameConfig.MAP_PLAYER_LIMITS[map_key]
-		var hint := "%d – %d zones" % [limits["min"], limits["max"]]
-		var hw := font.get_string_size(hint, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+		# Valid zone count hint
+		var valid: Array = GameConfig.MAP_VALID_PLAYERS[map_key]
+		var hint: String = _format_valid_hint(valid)
+		var hw := font.get_string_size(hint, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
 		draw_string(font, Vector2(centre.x - hw / 2.0, rect.position.y + CARD_H - 2.0),
-			hint, HORIZONTAL_ALIGNMENT_LEFT, -1, 13,
+			hint, HORIZONTAL_ALIGNMENT_LEFT, -1, 12,
 			Color(0.45, 0.6, 0.85, 0.85) if is_selected else Color(0.4, 0.4, 0.55, 0.7))
 
 
+func _format_valid_hint(valid: Array) -> String:
+	## Returns a compact string like "2–8 zones" or "3, 5 zones".
+	if valid.size() == 1:
+		return str(valid[0]) + " zones"
+	# Consecutive range? e.g. [2,3,4,5,6,7,8]
+	if valid[-1] - valid[0] + 1 == valid.size():
+		return "%d–%d zones" % [valid[0], valid[-1]]
+	var parts: PackedStringArray = PackedStringArray()
+	for v: int in valid:
+		parts.append(str(v))
+	return ", ".join(parts) + " zones"
+
+
 func _get_preview_verts(map_key: String) -> PackedVector2Array:
-	## Vertices are clockwise starting from the bottom-left of the bottom face (side 0).
+	## Vertices clockwise from bottom-left of side 0. All scaled to ≈R=80–90.
 	match map_key:
 		"triangle":
-			# Equilateral: h=162, s≈187, side 0 = bottom, side 1 = right, side 2 = left
+			# Equilateral: h=162, s≈187
 			return PackedVector2Array([
 				Vector2(-94, 72), Vector2(94, 72), Vector2(0, -90),
 			])
 		"square":
-			# True square: side 0 = bottom, side 1 = right, side 2 = top, side 3 = left
+			# True square: side=144
 			return PackedVector2Array([
 				Vector2(-72, 72),  Vector2(72, 72),
 				Vector2(72, -72),  Vector2(-72, -72),
 			])
-		_:  # octagon — regular, inradius=90, all edges ≈74px
-			# Side 0 = bottom, continuing clockwise
+		"pentagon":
+			# Regular pentagon: R=90, flat bottom, all sides ≈106px
+			return PackedVector2Array([
+				Vector2(-53, 73), Vector2(53, 73),
+				Vector2(86, -28), Vector2(0, -90),
+				Vector2(-86, -28),
+			])
+		"hexagon":
+			# Regular hexagon: R=80, flat bottom, all sides=80px
+			return PackedVector2Array([
+				Vector2(-40, 69), Vector2(40, 69),
+				Vector2(80, 0),   Vector2(40, -69),
+				Vector2(-40, -69), Vector2(-80, 0),
+			])
+		"heptagon":
+			# Regular heptagon: R=80, flat bottom
+			return PackedVector2Array([
+				Vector2(-35, 72), Vector2(35, 72),
+				Vector2(78, 18),  Vector2(63, -50),
+				Vector2(0, -80),  Vector2(-63, -50),
+				Vector2(-78, 18),
+			])
+		_:  # octagon — regular, R=90, all edges ≈69px
 			return PackedVector2Array([
 				Vector2(-37, 90),  Vector2(37, 90),
 				Vector2(90, 37),   Vector2(90, -37),
@@ -259,17 +308,16 @@ func _draw_map_preview(centre: Vector2, map_key: String, card_index: int) -> voi
 	outline.append(poly[0])
 	draw_polyline(outline, Color(0.5, 0.55, 0.75, 0.85), 1.5)
 
-	# Active zone dots — use the num_players for this card only if it's selected;
-	# for other cards, show their minimum valid count so the preview is always valid.
+	# Active zone dots — selected card shows current num_players; others show minimum.
+	var valid: Array = GameConfig.MAP_VALID_PLAYERS[map_key]
 	var preview_players: int
 	if card_index == selected_map_index:
 		preview_players = num_players
 	else:
-		preview_players = GameConfig.MAP_PLAYER_LIMITS[map_key]["min"]
-
-	# Clamp to this card's valid range
-	var limits: Dictionary = GameConfig.MAP_PLAYER_LIMITS[map_key]
-	preview_players = clamp(preview_players, limits["min"], limits["max"])
+		preview_players = valid[0]
+	# Ensure preview_players is a valid entry for this map.
+	if not valid.has(preview_players):
+		preview_players = valid[0]
 
 	var sides: Array = GameConfig.MAP_ZONE_SIDES[map_key][preview_players]
 	for slot in sides.size():
@@ -303,8 +351,8 @@ func _slot_colour(slot: int) -> int:
 func _draw_player_count_row() -> void:
 	var font := ThemeDB.fallback_font
 	var cx: float = ARENA_WIDTH / 2.0
-	var row_y: float = CARD_Y + CARD_H + 40.0
-	var limits: Dictionary = _current_limits()
+	var row_y: float = CARDS_TOP_Y + 2.0 * CARD_H + CARD_ROW_GAP + 22.0
+	var valid: Array = _current_valid_players()
 
 	# Label
 	var lbl := "ZONES IN PLAY"
@@ -313,10 +361,11 @@ func _draw_player_count_row() -> void:
 		lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.6, 0.65, 0.8, 1.0))
 
 	# ← arrow
-	var arr_y: float = row_y + 24.0
+	var arr_y: float = row_y + 22.0
 	var arr_h: float = 44.0
 	var arr_w: float = 44.0
-	var can_dec: bool = num_players > limits["min"]
+	var cur_idx: int = valid.find(num_players)
+	var can_dec: bool = cur_idx > 0
 	_arrow_left_rect = Rect2(cx - 130.0, arr_y, arr_w, arr_h)
 	_draw_arrow_button(_arrow_left_rect, "←", hover_section == "arrow_left", can_dec)
 
@@ -327,7 +376,7 @@ func _draw_player_count_row() -> void:
 		num_str, HORIZONTAL_ALIGNMENT_LEFT, -1, 36, Color.WHITE)
 
 	# → arrow
-	var can_inc: bool = num_players < limits["max"]
+	var can_inc: bool = cur_idx >= 0 and cur_idx < valid.size() - 1
 	_arrow_right_rect = Rect2(cx + 86.0, arr_y, arr_w, arr_h)
 	_draw_arrow_button(_arrow_right_rect, "→", hover_section == "arrow_right", can_inc)
 

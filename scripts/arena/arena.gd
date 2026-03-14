@@ -119,6 +119,35 @@ func _get_map_vertices(map: String) -> PackedVector2Array:
 			return PackedVector2Array([
 				Vector2(294, 660), Vector2(986, 660), Vector2(640, 60),
 			])
+		"pentagon":
+			# Regular pentagon: R=332, center=(640,360), all sides ≈390px.
+			# 5 vertices clockwise: BL(0), BR(1), right(2), apex(3), left(4)
+			return PackedVector2Array([
+				Vector2(445, 629), Vector2(835, 629),   # side 0: bottom (player)
+				Vector2(956, 257),                      # side 1: lower-right
+				Vector2(640, 28),                       # side 2: upper-right
+				Vector2(324, 257),                      # sides 3–4: upper-left, lower-left
+			])
+		"hexagon":
+			# Regular hexagon: R=346, center=(640,360), all sides ≈346px.
+			# 6 vertices clockwise: BL(0), BR(1), R(2), TR(3), TL(4), L(5)
+			return PackedVector2Array([
+				Vector2(467, 660), Vector2(813, 660),   # side 0: bottom (player)
+				Vector2(986, 360),                      # side 1: lower-right
+				Vector2(813, 60),  Vector2(467, 60),    # sides 2–3: upper-right, top
+				Vector2(294, 360),                      # sides 4–5: upper-left, lower-left
+			])
+		"heptagon":
+			# Regular heptagon: R=316, center=(640,360), all sides ≈274px.
+			# Clockwise flat-bottom.
+			return PackedVector2Array([
+				Vector2(503, 645), Vector2(777, 645),   # side 0: bottom (player)
+				Vector2(948, 430),                      # side 1: lower-right
+				Vector2(887, 163),                      # side 2: upper-right
+				Vector2(640, 44),                       # side 3: top-right to apex; side 4: apex to top-left
+				Vector2(393, 163),                      # side 5: upper-left
+				Vector2(332, 430),                      # side 6: lower-left
+			])
 		"octagon":
 			# Regular octagon: inradius=320, center=(640,360), all edges ≈264px.
 			# Clockwise from the bottom-left vertex of side 0 (player's bottom face).
