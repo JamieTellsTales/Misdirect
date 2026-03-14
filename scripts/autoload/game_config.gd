@@ -44,6 +44,9 @@ const MODIFIERS: Array = [
 	},
 ]
 
+## Total achievements defined in the game. Update this as achievements are added.
+const TOTAL_ACHIEVEMENTS: int = 0
+
 var selected_power_up: String = ""  # "", "gravity", "double_rebound"
 var active_modifiers: Array = []    # e.g. ["random_directions", "rotated_colours"]
 var selected_map: String = "square"

@@ -64,20 +64,28 @@ func _draw() -> void:
 		Color(0.4, 0.4, 0.5, 0.7), 1.0
 	)
 
+	# Totals derived from canonical lists in GameConfig
+	var total_powerups: int = 0
+	for pu in GameConfig.POWER_UPS:
+		if pu["id"] != "":
+			total_powerups += 1
+	var total_modifiers:    int = GameConfig.MODIFIERS.size()
+	var total_achievements: int = GameConfig.TOTAL_ACHIEVEMENTS
+
 	# Stat rows
 	var rows: Array = [
-		["High Score",         "%d" % StatsManager.high_score,                          Color(1.0,  0.84, 0.0,  1.0)],
-		["Total Score",        "%d" % StatsManager.total_score,                         Color(0.8,  0.8,  0.9,  1.0)],
-		["Points Available",   "%d" % StatsManager.points,                              Color(0.4,  0.9,  0.4,  1.0)],
-		["Games Played",       "%d" % StatsManager.games_played,                        Color(0.8,  0.8,  0.9,  1.0)],
-		["Wins",               "%d" % StatsManager.wins,                                Color(0.4,  0.9,  0.4,  1.0)],
-		["Losses",             "%d" % StatsManager.losses,                              Color(0.9,  0.4,  0.4,  1.0)],
-		["Win / Loss Ratio",   StatsManager.win_loss_ratio(),                           Color(0.8,  0.8,  0.9,  1.0)],
-		["Time Played",        StatsManager.format_time(StatsManager.total_time_played),Color(0.8,  0.8,  0.9,  1.0)],
-		["Achievements",       "%d unlocked" % StatsManager.achievements_unlocked,      Color(0.8,  0.8,  0.9,  1.0)],
-		["Powerups",           "%d unlocked" % StatsManager.powerups_unlocked,          Color(0.8,  0.8,  0.9,  1.0)],
-		["Modifiers",          "%d unlocked" % StatsManager.modifiers_unlocked,         Color(0.8,  0.8,  0.9,  1.0)],
-		["Longest Endless",    "— coming soon",                                         Color(0.45, 0.45, 0.55, 1.0)],
+		["High Score",       "%d" % StatsManager.high_score,                           Color(1.0,  0.84, 0.0,  1.0)],
+		["Total Score",      "%d" % StatsManager.total_score,                          Color(0.8,  0.8,  0.9,  1.0)],
+		["Points Available", "%d" % StatsManager.points,                               Color(0.4,  0.9,  0.4,  1.0)],
+		["Games Played",     "%d" % StatsManager.games_played,                         Color(0.8,  0.8,  0.9,  1.0)],
+		["Wins",             "%d" % StatsManager.wins,                                 Color(0.4,  0.9,  0.4,  1.0)],
+		["Losses",           "%d" % StatsManager.losses,                               Color(0.9,  0.4,  0.4,  1.0)],
+		["Win / Loss Ratio", StatsManager.win_loss_ratio(),                            Color(0.8,  0.8,  0.9,  1.0)],
+		["Time Played",      StatsManager.format_time(StatsManager.total_time_played), Color(0.8,  0.8,  0.9,  1.0)],
+		["Achievements",     "%d / %d" % [StatsManager.achievements_unlocked, total_achievements], Color(0.8, 0.8, 0.9, 1.0)],
+		["Powerups",         "%d / %d" % [StatsManager.powerups_unlocked,     total_powerups],     Color(0.8, 0.8, 0.9, 1.0)],
+		["Modifiers",        "%d / %d" % [StatsManager.modifiers_unlocked,    total_modifiers],    Color(0.8, 0.8, 0.9, 1.0)],
+		["Longest Endless",  "— coming soon",                                          Color(0.45, 0.45, 0.55, 1.0)],
 	]
 
 	var label_size: int  = 20
