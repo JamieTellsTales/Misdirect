@@ -69,7 +69,14 @@ func _draw() -> void:
 
 	draw_rect(Rect2(Vector2.ZERO, Vector2(1280.0, 720.0)), Color(0, 0, 0, 0.5))
 
-	var box_w: float = 520.0
+	var font := ThemeDB.fallback_font
+
+	# Box width: just wide enough for the instructions line + 24 px padding each side.
+	var inst_size: int = 15
+	var inst_text: String = "ENTER — play again     ESC — main menu"
+	var inst_text_w := font.get_string_size(inst_text, HORIZONTAL_ALIGNMENT_LEFT, -1, inst_size).x
+	var box_w: float = inst_text_w + 48.0
+
 	# Height grows with the number of score rows so all colours always fit.
 	var n: int = final_scores.size()
 	var box_h: float = 90.0              # header (title + divider + padding to first row)
@@ -86,8 +93,6 @@ func _draw() -> void:
 
 	draw_rect(box_rect, Color(0.07, 0.07, 0.12, 0.97))
 	draw_rect(box_rect, Color(0.55, 0.55, 0.65, 1.0), false, 2.0)
-
-	var font := ThemeDB.fallback_font
 
 	var title: String
 	var title_color: Color
@@ -154,9 +159,7 @@ func _draw() -> void:
 		draw_string(font, Vector2(center_x - pts_w / 2.0, extra_y),
 			pts_text, HORIZONTAL_ALIGNMENT_LEFT, -1, pts_size, Color(0.55, 0.85, 0.55, 1.0))
 
-	var inst_size: int = 15
-	var inst_text: String = "ENTER — play again     ESC — main menu"
-	var inst_w := font.get_string_size(inst_text, HORIZONTAL_ALIGNMENT_LEFT, -1, inst_size).x
+	var inst_w: float = inst_text_w  # already measured above for box_w
 	draw_string(font, Vector2(center_x - inst_w / 2.0, box_y + box_h - 20.0),
 		inst_text, HORIZONTAL_ALIGNMENT_LEFT, -1, inst_size, Color(0.45, 0.45, 0.55, 1.0))
 
