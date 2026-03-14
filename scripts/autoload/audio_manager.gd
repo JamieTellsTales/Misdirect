@@ -19,9 +19,13 @@ const GAME_TRACKS: Array = [
 	"res://assets/audio/Action & Dramatic Theme #10 (looped).wav",
 ]
 
+const FADE_DURATION: float = 1.5   # seconds for fade in / fade out
+
 var music_player: AudioStreamPlayer
 var sfx_player: AudioStreamPlayer
-var current_path: String = ""
+var current_path: String  = ""
+var _pending_path: String = ""
+var _fade_tween: Tween    = null
 
 # Pre-generated SFX streams — built once at startup to avoid mid-game stutter
 var _correct_stream: AudioStreamWAV
@@ -86,8 +90,13 @@ func play_game_music() -> void:
 
 
 func stop_music() -> void:
-	music_player.stop()
-	current_path = ""
+	if music_player.playing:
+		_fade_out(func() -> void:
+			music_player.stop()
+			current_path = ""
+		)
+	else:
+		current_path = ""
 
 
 func play_correct_catch() -> void:
@@ -111,8 +120,9 @@ func play_game_over() -> void:
 # ── Internal ─────────────────────────────────────────────────────────────────
 
 func _on_music_finished() -> void:
-	## Called when the track ends — restart it to loop continuously.
+	## Called when the track ends — restart it to loop continuously (no fade).
 	if current_path != "":
+		music_player.volume_db = 0.0
 		music_player.play()
 
 
@@ -120,14 +130,47 @@ func _play(path: String) -> void:
 	if current_path == path and music_player.playing:
 		return  # Already playing this track — don't restart it
 
+	if music_player.playing:
+		# Fade out the current track, then swap to the new one
+		_pending_path = path
+		_fade_out(_swap_to_pending)
+	else:
+		_start_track(path)
+
+
+func _start_track(path: String) -> void:
 	var stream := load(path) as AudioStreamWAV
 	if stream == null:
 		push_warning("AudioManager: could not load track: " + path)
 		return
 
-	current_path = path
-	music_player.stream = stream
+	current_path          = path
+	music_player.volume_db = -80.0
+	music_player.stream   = stream
 	music_player.play()
+	_fade_in()
+
+
+func _fade_in() -> void:
+	if _fade_tween and _fade_tween.is_valid():
+		_fade_tween.kill()
+	_fade_tween = create_tween()
+	_fade_tween.tween_property(music_player, "volume_db", 0.0, FADE_DURATION)
+
+
+func _fade_out(on_done: Callable = Callable()) -> void:
+	if _fade_tween and _fade_tween.is_valid():
+		_fade_tween.kill()
+	_fade_tween = create_tween()
+	_fade_tween.tween_property(music_player, "volume_db", -80.0, FADE_DURATION)
+	if on_done.is_valid():
+		_fade_tween.tween_callback(on_done)
+
+
+func _swap_to_pending() -> void:
+	var path: String = _pending_path
+	_pending_path    = ""
+	_start_track(path)
 
 
 func _generate_chord_stab() -> AudioStreamWAV:
