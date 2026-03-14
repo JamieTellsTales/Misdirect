@@ -34,7 +34,7 @@ const MODIFIERS: Array = [
 	{
 		"id": "rotated_colours",
 		"label": "Rotated Colours",
-		"desc": "Each colour targets the next zone clockwise — nothing goes where you expect",
+		"desc": "Each colour targets the next zone anti-clockwise — nothing goes where you expect",
 	},
 	{
 		"id": "speed_ball",

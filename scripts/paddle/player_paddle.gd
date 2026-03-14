@@ -48,10 +48,10 @@ func _get_input_direction() -> float:
 
 func _apply_gravity() -> void:
 	var range_sq: float = GRAVITY_RANGE * GRAVITY_RANGE
-	for ticket in get_tree().get_nodes_in_group("tickets"):
-		var offset: Vector2 = global_position - ticket.global_position
+	for ball in get_tree().get_nodes_in_group("balls"):
+		var offset: Vector2 = global_position - ball.global_position
 		if offset.length_squared() <= range_sq:
-			ticket.apply_central_force(offset.normalized() * GRAVITY_FORCE)
+			ball.apply_central_force(offset.normalized() * GRAVITY_FORCE)
 
 
 func _draw() -> void:

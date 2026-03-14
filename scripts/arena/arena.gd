@@ -25,11 +25,11 @@ const SLOT_COLOURS: Array = [
 	ColourData.ColourType.PINK,
 ]
 
-@export var ticket_spawn_interval: float = 2.5
-@export var max_tickets: int = 10
+@export var ball_spawn_interval: float = 2.5
+@export var max_balls: int = 10
 @export var round_duration: float = 120.0
 
-var ticket_scene:        PackedScene = preload("res://scenes/components/ticket.tscn")
+var ball_scene:        PackedScene = preload("res://scenes/components/ticket.tscn")
 var zone_scene:          PackedScene = preload("res://scenes/components/department_zone.tscn")
 var paddle_scene:        PackedScene = preload("res://scenes/components/paddle.tscn")
 var player_paddle_scene: PackedScene = preload("res://scenes/components/player_paddle.tscn")
@@ -82,9 +82,9 @@ func _process(delta: float) -> void:
 		return
 	session_time += delta
 	spawn_timer += delta
-	if spawn_timer >= ticket_spawn_interval:
+	if spawn_timer >= ball_spawn_interval:
 		spawn_timer = 0.0
-		_try_spawn_ticket()
+		_try_spawn_ball()
 
 
 # ── Active colours ─────────────────────────────────────────────────────────────
@@ -181,8 +181,8 @@ func _start_round() -> void:
 	if timer_display:
 		timer_display.round_duration = round_duration
 		timer_display.start_timer()
-	_spawn_ticket()
-	_spawn_ticket()
+	_spawn_ball()
+	_spawn_ball()
 
 
 func _end_round() -> void:
@@ -480,29 +480,29 @@ func _on_score_down(ct: int, points: int) -> void:
 			score_displays[ct].set_score(scores[ct])
 
 
-func _on_wrong_catch(_ticket: Node2D, _ct: int) -> void:
+func _on_wrong_catch(_ball: Node2D, _ct: int) -> void:
 	pass
 
 
-# ── Ticket spawning ────────────────────────────────────────────────────────────
+# ── Ball spawning ──────────────────────────────────────────────────────────────
 
-func _try_spawn_ticket() -> void:
+func _try_spawn_ball() -> void:
 	if is_game_over:
 		return
-	if get_tree().get_nodes_in_group("tickets").size() < max_tickets:
-		_spawn_ticket()
+	if get_tree().get_nodes_in_group("balls").size() < max_balls:
+		_spawn_ball()
 
 
-func _spawn_ticket() -> void:
-	var ticket := ticket_scene.instantiate()
-	ticket.position = Vector2(ARENA_WIDTH / 2.0, ARENA_HEIGHT / 2.0)
+func _spawn_ball() -> void:
+	var ball := ball_scene.instantiate()
+	ball.position = Vector2(ARENA_WIDTH / 2.0, ARENA_HEIGHT / 2.0)
 
 	var ct: int = active_colours[spawn_colour_index % active_colours.size()]
 	spawn_colour_index += 1
-	ticket.set_colour(ct)
-	ticket.set_random_size()
-	add_child(ticket)
-	ticket.request_split.connect(_on_ticket_split)
+	ball.set_colour(ct)
+	ball.set_random_size()
+	add_child(ball)
+	ball.request_split.connect(_on_ball_split)
 
 	var vel_angle: float
 	if GameConfig.has_modifier("random_directions"):
@@ -512,8 +512,8 @@ func _spawn_ticket() -> void:
 		vel_angle = base_angle + randf_range(-PI / 9.0, PI / 9.0)
 
 	if GameConfig.has_modifier("speed_ball"):
-		ticket.speed_multiplier = 2.0
-	ticket.linear_velocity = Vector2.from_angle(vel_angle) * ticket.base_speed * ticket.speed_multiplier
+		ball.speed_multiplier = 2.0
+	ball.linear_velocity = Vector2.from_angle(vel_angle) * ball.base_speed * ball.speed_multiplier
 
 
 func _get_zone_direction_angle(ct: int) -> float:
@@ -521,18 +521,18 @@ func _get_zone_direction_angle(ct: int) -> float:
 	var colour_index: int = active_colours.find(ct)
 	var target_index: int = colour_index
 	if GameConfig.has_modifier("rotated_colours"):
-		target_index = (colour_index + 1) % active_colours.size()
+		target_index = (colour_index - 1 + active_colours.size()) % active_colours.size()
 	var target_ct: int = active_colours[target_index]
 	return _zone_angles.get(target_ct, randf_range(0.0, TAU))
 
 
-func _on_ticket_split(original: RigidBody2D, count: int) -> void:
+func _on_ball_split(original: RigidBody2D, count: int) -> void:
 	if not is_instance_valid(original):
 		return
-	call_deferred("_do_ticket_split", original, count)
+	call_deferred("_do_ball_split", original, count)
 
 
-func _do_ticket_split(original: RigidBody2D, count: int) -> void:
+func _do_ball_split(original: RigidBody2D, count: int) -> void:
 	if not is_instance_valid(original):
 		return
 
@@ -544,7 +544,7 @@ func _do_ticket_split(original: RigidBody2D, count: int) -> void:
 	original.queue_free()
 
 	for i in count:
-		var t: RigidBody2D = ticket_scene.instantiate()
+		var t: RigidBody2D = ball_scene.instantiate()
 		t.position   = pos
 		t.set_colour(ct)
 		t.size_scale = max(0.4, sz * 0.75)
@@ -554,7 +554,7 @@ func _do_ticket_split(original: RigidBody2D, count: int) -> void:
 
 		var angle: float = vel.angle() + randf_range(-PI / 5.0, PI / 5.0)
 		t.linear_velocity = Vector2.from_angle(angle) * vel.length() * 1.1
-		t.request_split.connect(_on_ticket_split)
+		t.request_split.connect(_on_ball_split)
 
 
 # ── Drawing ────────────────────────────────────────────────────────────────────

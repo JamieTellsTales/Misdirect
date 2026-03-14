@@ -1,13 +1,13 @@
 extends Area2D
 class_name ColourZone
 ## A zone at the edge of the arena belonging to a colour
-## Tickets entering this zone score points (correct colour) or lose points (wrong colour)
+## Balls entering this zone score points (correct colour) or lose points (wrong colour)
 
 const ColourData = preload("res://scripts/resources/department_data.gd")
 
 signal score_up(colour_type: int, points: int)
 signal score_down(colour_type: int, points: int)
-signal wrong_catch(ticket: Node2D, colour_type: int)
+signal wrong_catch(ball: Node2D, colour_type: int)
 
 @export_enum("BLUE", "GREEN", "RED", "YELLOW", "PURPLE") var colour_type: int = 0
 @export var zone_depth: float = 60.0
@@ -89,13 +89,13 @@ func _draw() -> void:
 func _on_body_entered(body: Node2D) -> void:
 	if is_collapsed:
 		return
-	if body.is_in_group("tickets"):
-		_handle_ticket(body)
+	if body.is_in_group("balls"):
+		_handle_ball(body)
 
 
-func _handle_ticket(ticket: Node2D) -> void:
-	var points: int = ticket.get_point_value()
-	var is_correct: bool = ticket.matches_colour(colour_type)
+func _handle_ball(ball: Node2D) -> void:
+	var points: int = ball.get_point_value()
+	var is_correct: bool = ball.matches_colour(colour_type)
 
 	if is_correct:
 		_flash(Color.GREEN)
@@ -104,10 +104,10 @@ func _handle_ticket(ticket: Node2D) -> void:
 	else:
 		_flash(Color.RED)
 		score_down.emit(colour_type, points)
-		wrong_catch.emit(ticket, colour_type)
+		wrong_catch.emit(ball, colour_type)
 		AudioManager.play_wrong_catch()
 
-	ticket.queue_free()
+	ball.queue_free()
 
 
 func _flash(color: Color) -> void:

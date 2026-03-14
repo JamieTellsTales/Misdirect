@@ -1,15 +1,15 @@
 extends RigidBody2D
-class_name Ticket
-## Ticket - A bouncing ball in the arena
+class_name Ball
+## Ball - A bouncing ball in the arena
 
 const ColourData = preload("res://scripts/resources/department_data.gd")
 
-signal request_split(ticket: RigidBody2D, count: int)
+signal request_split(ball: RigidBody2D, count: int)
 
-@export var ticket_color: Color = Color.DODGER_BLUE
+@export var ball_color: Color = Color.DODGER_BLUE
 @export var base_speed: float = 300.0
 
-# Colour this ticket belongs to
+# Colour this ball belongs to
 var colour_type: int = ColourData.ColourType.BLUE
 
 # Size affects speed and points (0.5 to 2.0 scale)
@@ -34,7 +34,7 @@ var split_cooldown: float = 0.0
 
 
 func _ready() -> void:
-	add_to_group("tickets")
+	add_to_group("balls")
 	_apply_size()
 	queue_redraw()
 
@@ -101,10 +101,10 @@ func _on_body_entered(body: Node) -> void:
 
 
 func _draw() -> void:
-	draw_circle(Vector2.ZERO, radius, ticket_color)
+	draw_circle(Vector2.ZERO, radius, ball_color)
 
 	var border_width: float = 2.0 + size_scale
-	draw_arc(Vector2.ZERO, radius, 0, TAU, 32, ticket_color.lightened(0.3), border_width)
+	draw_arc(Vector2.ZERO, radius, 0, TAU, 32, ball_color.lightened(0.3), border_width)
 
 	if has_blame_stamp:
 		var stamp_color := Color.BLACK
@@ -114,14 +114,14 @@ func _draw() -> void:
 		draw_line(Vector2(stamp_size, -stamp_size), Vector2(-stamp_size, stamp_size), stamp_color, 3.0)
 
 
-func set_ticket_color(color: Color) -> void:
-	ticket_color = color
+func set_ball_color(color: Color) -> void:
+	ball_color = color
 	queue_redraw()
 
 
 func set_colour(ct: int) -> void:
 	colour_type = ct
-	ticket_color = ColourData.get_color(ct)
+	ball_color = ColourData.get_color(ct)
 	queue_redraw()
 
 

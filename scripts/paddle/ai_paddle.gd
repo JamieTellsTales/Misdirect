@@ -15,7 +15,7 @@ var panic_threshold: int = 3
 # Internal state
 var target_offset: float = 0.0     # Target position as scalar offset from zone_centre
 var reaction_timer: float = 0.0
-var current_target_ticket: Node2D = null
+var current_target_ball: Node2D = null
 var is_panicking: bool = false
 
 
@@ -74,44 +74,44 @@ func _physics_process(delta: float) -> void:
 
 
 func _update_target() -> void:
-	var tickets := get_tree().get_nodes_in_group("tickets")
-	if tickets.is_empty():
-		current_target_ticket = null
+	var balls := get_tree().get_nodes_in_group("balls")
+	if balls.is_empty():
+		current_target_ball = null
 		return
 
-	var best_ticket: Node2D = null
+	var best_ball: Node2D = null
 	var best_threat: float = -1.0
-	for ticket in tickets:
-		var t := _calculate_threat(ticket)
+	for ball in balls:
+		var t := _calculate_threat(ball)
 		if t > best_threat:
 			best_threat = t
-			best_ticket = ticket
+			best_ball = ball
 
-	current_target_ticket = best_ticket
-	if current_target_ticket:
+	current_target_ball = best_ball
+	if current_target_ball:
 		_calculate_target_offset()
 
 
-func _calculate_threat(ticket: Node2D) -> float:
-	if ignore_purple and ticket.colour_type == ColourData.ColourType.PURPLE:
+func _calculate_threat(ball: Node2D) -> float:
+	if ignore_purple and ball.colour_type == ColourData.ColourType.PURPLE:
 		return -1.0
 
-	var is_own: bool = ticket.colour_type == colour_type
+	var is_own: bool = ball.colour_type == colour_type
 	if is_own and not should_deflect_own_colour:
 		return -0.5  # Let own colour pass through
 
-	var distance: float = (ticket.global_position - global_position).length()
+	var distance: float = (ball.global_position - global_position).length()
 
-	# Generic approach speed: positive when ticket moves toward this zone.
-	var approach_speed: float = ticket.linear_velocity.dot(outward_dir)
+	# Generic approach speed: positive when ball moves toward this zone.
+	var approach_speed: float = ball.linear_velocity.dot(outward_dir)
 	if approach_speed <= 0:
 		return -1.0
 
 	var threat: float = approach_speed / (distance + 100.0)
 
-	# Blue panic: degrades accuracy when many tickets are active.
+	# Blue panic: degrades accuracy when many balls are active.
 	if colour_type == ColourData.ColourType.BLUE:
-		var count := get_tree().get_nodes_in_group("tickets").size()
+		var count := get_tree().get_nodes_in_group("balls").size()
 		is_panicking = count >= panic_threshold
 		if is_panicking:
 			threat *= randf_range(0.5, 1.5)
@@ -120,11 +120,11 @@ func _calculate_threat(ticket: Node2D) -> float:
 
 
 func _calculate_target_offset() -> void:
-	if not current_target_ticket:
+	if not current_target_ball:
 		return
 
-	var predicted_pos: Vector2 = current_target_ticket.global_position \
-		+ current_target_ticket.linear_velocity * prediction_strength
+	var predicted_pos: Vector2 = current_target_ball.global_position \
+		+ current_target_ball.linear_velocity * prediction_strength
 
 	if randf() > accuracy:
 		# Jitter perpendicular to the slide axis

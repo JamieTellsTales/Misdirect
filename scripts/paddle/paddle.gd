@@ -1,6 +1,6 @@
 extends CharacterBody2D
 class_name Paddle
-## Base paddle class for deflecting tickets.
+## Base paddle class for deflecting balls.
 ## The paddle is ALWAYS drawn as a horizontal bar in local space.
 ## arena.gd sets `rotation` on the node to orient it along its zone edge,
 ## and sets the movement properties before add_child() so _ready() has them.
@@ -29,7 +29,7 @@ func _ready() -> void:
 	paddle_color = ColourData.get_color(colour_type)
 	_setup_collision_shape()
 	# Layer 4 (bit value 8): paddle–paddle collision only.
-	# Keeps paddle–ticket physics on lower layers unchanged.
+	# Keeps paddle–ball physics on lower layers unchanged.
 	collision_layer |= 8
 	collision_mask  |= 8
 	queue_redraw()
