@@ -19,7 +19,7 @@ const GAME_TRACKS: Array = [
 	"res://assets/audio/Action & Dramatic Theme #10 (looped).wav",
 ]
 
-const FADE_DURATION: float = 1.5   # seconds for crossfade
+const FADE_DURATION: float = 0.6   # seconds for crossfade
 
 # Two players for crossfading — one fades out while the other fades in.
 var _player_a: AudioStreamPlayer
