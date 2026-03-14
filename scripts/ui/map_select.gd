@@ -407,26 +407,26 @@ func _draw_arrow_button(rect: Rect2, label: String, hovered: bool, enabled: bool
 func _draw_bottom_buttons() -> void:
 	var font := ThemeDB.fallback_font
 	var cx: float = ARENA_WIDTH / 2.0
-	var by: float = ARENA_HEIGHT - 80.0
+	var by: float = ARENA_HEIGHT - 54.0   # Smaller buttons sit closer to the bottom edge
 
 	# NEXT →
-	var nx_w: float = 200.0; var nx_h: float = 52.0
-	_next_rect = Rect2(cx + 20.0, by, nx_w, nx_h)
+	var nx_w: float = 150.0; var nx_h: float = 36.0
+	_next_rect = Rect2(cx + 16.0, by, nx_w, nx_h)
 	var nx_hov: bool = hover_section == "next"
 	draw_rect(_next_rect, Color(0.15, 0.45, 0.22, 1.0) if nx_hov else Color(0.1, 0.32, 0.15, 1.0))
-	draw_rect(_next_rect, Color(0.3, 0.85, 0.45, 0.9), false, 2.0)
-	var nx_lbl := "NEXT →"; var nx_sz: int = 22
+	draw_rect(_next_rect, Color(0.3, 0.85, 0.45, 0.9), false, 1.5)
+	var nx_lbl := "NEXT →"; var nx_sz: int = 17
 	var nx_w2 := font.get_string_size(nx_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, nx_sz).x
-	draw_string(font, Vector2(_next_rect.position.x + (nx_w - nx_w2) / 2.0, by + 35.0),
+	draw_string(font, Vector2(_next_rect.position.x + (nx_w - nx_w2) / 2.0, by + 24.0),
 		nx_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, nx_sz, Color.WHITE)
 
 	# ← BACK
-	var bk_w: float = 160.0; var bk_h: float = 52.0
-	_back_rect = Rect2(cx - bk_w - 40.0, by, bk_w, bk_h)
+	var bk_w: float = 120.0; var bk_h: float = 36.0
+	_back_rect = Rect2(cx - bk_w - 32.0, by, bk_w, bk_h)
 	var bk_hov: bool = hover_section == "back"
 	draw_rect(_back_rect, Color(0.28, 0.28, 0.38, 1.0) if bk_hov else Color(0.18, 0.18, 0.26, 1.0))
 	draw_rect(_back_rect, Color(0.4, 0.4, 0.52, 0.7), false, 1.5)
-	var bk_lbl := "← BACK"; var bk_sz: int = 20
+	var bk_lbl := "← BACK"; var bk_sz: int = 15
 	var bk_w2 := font.get_string_size(bk_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, bk_sz).x
-	draw_string(font, Vector2(_back_rect.position.x + (bk_w - bk_w2) / 2.0, by + 34.0),
+	draw_string(font, Vector2(_back_rect.position.x + (bk_w - bk_w2) / 2.0, by + 23.0),
 		bk_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, bk_sz, Color(0.75, 0.75, 0.85, 1.0))

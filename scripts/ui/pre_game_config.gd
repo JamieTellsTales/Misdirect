@@ -30,6 +30,20 @@ var _pu_buy_rects: Array = []  # Array of {rect, id, price, index}
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	# Restore last selections for this profile, filtering out anything no longer unlocked.
+	if StatsManager.is_powerup_unlocked(StatsManager.last_power_up):
+		GameConfig.selected_power_up = StatsManager.last_power_up
+	else:
+		GameConfig.selected_power_up = ""
+	GameConfig.active_modifiers = []
+	for mod_id in StatsManager.last_modifiers:
+		var found: Dictionary = {}
+		for m in GameConfig.MODIFIERS:
+			if m["id"] == mod_id:
+				found = m
+				break
+		if not found.is_empty() and _is_modifier_unlocked(found):
+			GameConfig.active_modifiers.append(mod_id)
 
 
 func _process(_delta: float) -> void:
@@ -124,6 +138,7 @@ func _handle_click(pos: Vector2) -> void:
 
 
 func _start_game() -> void:
+	StatsManager.save_last_selections(GameConfig.selected_power_up, GameConfig.active_modifiers)
 	get_tree().change_scene_to_file("res://scenes/arena.tscn")
 
 

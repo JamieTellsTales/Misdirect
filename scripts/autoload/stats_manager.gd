@@ -21,6 +21,8 @@ var powerups_unlocked:       int   = 0
 var modifiers_unlocked:      int   = 0
 var longest_endless_seconds: float = 0.0   # Populated when endless mode ships
 var unlocked_powerups:       Array = []    # IDs of purchased power-ups
+var last_power_up:           String = ""   # Last selected power-up, restored on next pre-game screen
+var last_modifiers:          Array  = []   # Last selected modifiers, restored on next pre-game screen
 
 
 func _ready() -> void:
@@ -44,6 +46,8 @@ func load_stats() -> void:
 	modifiers_unlocked      = 0
 	longest_endless_seconds = 0.0
 	unlocked_powerups       = []
+	last_power_up           = ""
+	last_modifiers          = []
 
 	var config := ConfigFile.new()
 	if config.load(_stats_path()) != OK:
@@ -61,6 +65,8 @@ func load_stats() -> void:
 	modifiers_unlocked      = config.get_value("stats", "modifiers_unlocked",      0)
 	longest_endless_seconds = config.get_value("stats", "longest_endless_seconds", 0.0)
 	unlocked_powerups       = config.get_value("stats", "unlocked_powerups",       [])
+	last_power_up           = config.get_value("stats", "last_power_up",           "")
+	last_modifiers          = config.get_value("stats", "last_modifiers",          [])
 
 
 func save_stats() -> void:
@@ -77,6 +83,8 @@ func save_stats() -> void:
 	config.set_value("stats", "modifiers_unlocked",      modifiers_unlocked)
 	config.set_value("stats", "longest_endless_seconds", longest_endless_seconds)
 	config.set_value("stats", "unlocked_powerups",       unlocked_powerups)
+	config.set_value("stats", "last_power_up",           last_power_up)
+	config.set_value("stats", "last_modifiers",          last_modifiers)
 	config.save(_stats_path())
 
 
@@ -137,6 +145,13 @@ func unlock_powerup(id: String, price: int) -> bool:
 	powerups_unlocked = unlocked_powerups.size()
 	save_stats()
 	return true
+
+
+func save_last_selections(power_up: String, modifiers: Array) -> void:
+	## Persist the player's last power-up and modifier choices for this profile.
+	last_power_up  = power_up
+	last_modifiers = modifiers.duplicate()
+	save_stats()
 
 
 func format_time(seconds: float) -> String:
