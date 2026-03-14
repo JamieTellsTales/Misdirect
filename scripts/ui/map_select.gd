@@ -97,17 +97,13 @@ func _handle_click(pos: Vector2) -> void:
 			return
 
 	if _arrow_left_rect.has_point(pos):
-		var valid: Array = _current_valid_players()
-		var idx: int = valid.find(num_players)
-		if idx > 0:
-			num_players = valid[idx - 1]
+		if num_players > 2:
+			num_players -= 1
 		return
 
 	if _arrow_right_rect.has_point(pos):
-		var valid: Array = _current_valid_players()
-		var idx: int = valid.find(num_players)
-		if idx >= 0 and idx < valid.size() - 1:
-			num_players = valid[idx + 1]
+		if num_players < 8:
+			num_players += 1
 		return
 
 	if _next_rect.has_point(pos):
@@ -193,13 +189,16 @@ func _draw_cards() -> void:
 			Vector2(CARD_W, CARD_H))
 		_card_rects.append(rect)
 
-		var is_selected: bool = (i == selected_map_index)
-		var is_hovered:  bool = (hover_section == "card" and hover_index == i)
-		var map_key: String   = MAP_KEYS[i]
+		var is_selected:   bool = (i == selected_map_index)
+		var is_hovered:    bool = (hover_section == "card" and hover_index == i)
+		var map_key: String    = MAP_KEYS[i]
+		var supported: bool    = GameConfig.MAP_VALID_PLAYERS[map_key].has(num_players)
 
 		# Card background
 		var bg_col: Color
-		if is_selected:
+		if not supported:
+			bg_col = Color(0.06, 0.06, 0.09, 1.0)
+		elif is_selected:
 			bg_col = Color(0.1, 0.18, 0.28, 1.0)
 		elif is_hovered:
 			bg_col = Color(0.1, 0.12, 0.2, 1.0)
@@ -209,7 +208,9 @@ func _draw_cards() -> void:
 
 		# Border
 		var brd_col: Color
-		if is_selected:
+		if not supported:
+			brd_col = Color(0.18, 0.18, 0.22, 0.5)
+		elif is_selected:
 			brd_col = Color(0.35, 0.65, 1.0, 1.0)
 		elif is_hovered:
 			brd_col = Color(0.3, 0.45, 0.7, 0.85)
@@ -218,84 +219,70 @@ func _draw_cards() -> void:
 		draw_rect(rect, brd_col, false, 2.5 if is_selected else 1.5)
 
 		# Polygon preview
-		_draw_map_preview(centre + Vector2(0, -20), map_key, i)
+		_draw_map_preview(centre + Vector2(0, -20), map_key, supported)
 
 		# Label
 		var lbl: String = MAP_NAMES[i]
 		var lsz: int = 20 if is_selected else 17
+		var lc: Color
+		if not supported:
+			lc = Color(0.35, 0.35, 0.42, 1.0)
+		elif is_selected:
+			lc = Color.WHITE
+		else:
+			lc = Color(0.7, 0.75, 0.9, 1.0)
 		var lw := font.get_string_size(lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, lsz).x
-		var lc := Color.WHITE if is_selected else Color(0.7, 0.75, 0.9, 1.0)
-		draw_string(font, Vector2(centre.x - lw / 2.0, rect.position.y + CARD_H - 18.0),
+		draw_string(font, Vector2(centre.x - lw / 2.0, rect.position.y + CARD_H - 10.0),
 			lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, lsz, lc)
 
-		# Valid zone count hint
-		var valid: Array = GameConfig.MAP_VALID_PLAYERS[map_key]
-		var hint: String = _format_valid_hint(valid)
-		var hw := font.get_string_size(hint, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
-		draw_string(font, Vector2(centre.x - hw / 2.0, rect.position.y + CARD_H - 2.0),
-			hint, HORIZONTAL_ALIGNMENT_LEFT, -1, 12,
-			Color(0.45, 0.6, 0.85, 0.85) if is_selected else Color(0.4, 0.4, 0.55, 0.7))
-
-
-func _format_valid_hint(valid: Array) -> String:
-	## Returns a compact string like "2–8 zones" or "3, 5 zones".
-	if valid.size() == 1:
-		return str(valid[0]) + " zones"
-	# Consecutive range? e.g. [2,3,4,5,6,7,8]
-	if valid[-1] - valid[0] + 1 == valid.size():
-		return "%d–%d zones" % [valid[0], valid[-1]]
-	var parts: PackedStringArray = PackedStringArray()
-	for v: int in valid:
-		parts.append(str(v))
-	return ", ".join(parts) + " zones"
 
 
 func _get_preview_verts(map_key: String) -> PackedVector2Array:
-	## Vertices clockwise from bottom-left of side 0. All scaled to ≈R=80–90.
+	## Vertices clockwise from bottom-left of side 0. Scaled to fit within card.
 	match map_key:
 		"triangle":
-			# Equilateral: h=162, s≈187
+			# Equilateral flat-bottom, ~104px wide, ~90px tall
 			return PackedVector2Array([
-				Vector2(-94, 72), Vector2(94, 72), Vector2(0, -90),
+				Vector2(-52, 40), Vector2(52, 40), Vector2(0, -50),
 			])
 		"square":
-			# True square: side=144
+			# True square, 80×80px
 			return PackedVector2Array([
-				Vector2(-72, 72),  Vector2(72, 72),
-				Vector2(72, -72),  Vector2(-72, -72),
+				Vector2(-40, 40),  Vector2(40, 40),
+				Vector2(40, -40),  Vector2(-40, -40),
 			])
 		"pentagon":
-			# Regular pentagon: R=90, flat bottom, all sides ≈106px
+			# Regular pentagon, flat bottom
 			return PackedVector2Array([
-				Vector2(-53, 73), Vector2(53, 73),
-				Vector2(86, -28), Vector2(0, -90),
-				Vector2(-86, -28),
+				Vector2(-29, 40), Vector2(29, 40),
+				Vector2(47, -15), Vector2(0, -50),
+				Vector2(-47, -15),
 			])
 		"hexagon":
-			# Regular hexagon: R=80, flat bottom, all sides=80px
+			# Regular hexagon, flat bottom
 			return PackedVector2Array([
-				Vector2(-40, 69), Vector2(40, 69),
-				Vector2(80, 0),   Vector2(40, -69),
-				Vector2(-40, -69), Vector2(-80, 0),
+				Vector2(-22, 38), Vector2(22, 38),
+				Vector2(44, 0),   Vector2(22, -38),
+				Vector2(-22, -38), Vector2(-44, 0),
 			])
 		"heptagon":
-			# Regular heptagon: R=80, flat bottom
+			# Regular heptagon, flat bottom
 			return PackedVector2Array([
-				Vector2(-35, 72), Vector2(35, 72),
-				Vector2(78, 18),  Vector2(63, -50),
-				Vector2(0, -80),  Vector2(-63, -50),
-				Vector2(-78, 18),
+				Vector2(-19, 40), Vector2(19, 40),
+				Vector2(43, 10),  Vector2(35, -28),
+				Vector2(0, -44),  Vector2(-35, -28),
+				Vector2(-43, 10),
 			])
-		_:  # octagon — regular, R=90, all edges ≈69px
+		_:  # octagon — regular, flat bottom
 			return PackedVector2Array([
-				Vector2(-37, 90),  Vector2(37, 90),
-				Vector2(90, 37),   Vector2(90, -37),
-				Vector2(37, -90),  Vector2(-37, -90),
-				Vector2(-90, -37), Vector2(-90, 37),
+				Vector2(-20, 50),  Vector2(20, 50),
+				Vector2(50, 20),   Vector2(50, -20),
+				Vector2(20, -50),  Vector2(-20, -50),
+				Vector2(-50, -20), Vector2(-50, 20),
 			])
 
 
-func _draw_map_preview(centre: Vector2, map_key: String, card_index: int) -> void:
+func _draw_map_preview(centre: Vector2, map_key: String, supported: bool) -> void:
 	## Draws the polygon outline and coloured zone dots for the current player count.
 	var verts: PackedVector2Array = _get_preview_verts(map_key)
 	var n: int = verts.size()
@@ -306,20 +293,14 @@ func _draw_map_preview(centre: Vector2, map_key: String, card_index: int) -> voi
 		poly.append(centre + v)
 	var outline := poly.duplicate()
 	outline.append(poly[0])
-	draw_polyline(outline, Color(0.5, 0.55, 0.75, 0.85), 1.5)
+	var outline_col: Color = Color(0.5, 0.55, 0.75, 0.85) if supported else Color(0.25, 0.25, 0.32, 0.5)
+	draw_polyline(outline, outline_col, 1.5)
 
-	# Active zone dots — selected card shows current num_players; others show minimum.
-	var valid: Array = GameConfig.MAP_VALID_PLAYERS[map_key]
-	var preview_players: int
-	if card_index == selected_map_index:
-		preview_players = num_players
-	else:
-		preview_players = valid[0]
-	# Ensure preview_players is a valid entry for this map.
-	if not valid.has(preview_players):
-		preview_players = valid[0]
+	# Zone dots — only shown when this map supports the current player count.
+	if not supported:
+		return
 
-	var sides: Array = GameConfig.MAP_ZONE_SIDES[map_key][preview_players]
+	var sides: Array = GameConfig.MAP_ZONE_SIDES[map_key][num_players]
 	for slot in sides.size():
 		var side_idx: int = sides[slot]
 		var a: Vector2 = centre + verts[side_idx]
@@ -352,7 +333,6 @@ func _draw_player_count_row() -> void:
 	var font := ThemeDB.fallback_font
 	var cx: float = ARENA_WIDTH / 2.0
 	var row_y: float = CARDS_TOP_Y + 2.0 * CARD_H + CARD_ROW_GAP + 22.0
-	var valid: Array = _current_valid_players()
 
 	# Label
 	var lbl := "ZONES IN PLAY"
@@ -364,8 +344,7 @@ func _draw_player_count_row() -> void:
 	var arr_y: float = row_y + 22.0
 	var arr_h: float = 44.0
 	var arr_w: float = 44.0
-	var cur_idx: int = valid.find(num_players)
-	var can_dec: bool = cur_idx > 0
+	var can_dec: bool = num_players > 2
 	_arrow_left_rect = Rect2(cx - 130.0, arr_y, arr_w, arr_h)
 	_draw_arrow_button(_arrow_left_rect, "←", hover_section == "arrow_left", can_dec)
 
@@ -376,28 +355,37 @@ func _draw_player_count_row() -> void:
 		num_str, HORIZONTAL_ALIGNMENT_LEFT, -1, 36, Color.WHITE)
 
 	# → arrow
-	var can_inc: bool = cur_idx >= 0 and cur_idx < valid.size() - 1
+	var can_inc: bool = num_players < 8
 	_arrow_right_rect = Rect2(cx + 86.0, arr_y, arr_w, arr_h)
 	_draw_arrow_button(_arrow_right_rect, "→", hover_section == "arrow_right", can_inc)
 
-	# Zone dot colour preview row below the counter
-	var dot_row_y: float = arr_y + arr_h + 14.0
-	var sides: Array = GameConfig.MAP_ZONE_SIDES[MAP_KEYS[selected_map_index]][num_players]
-	var dot_spacing: float = 30.0
-	var total_w: float = (sides.size() - 1) * dot_spacing
-	for slot in sides.size():
-		var dot_x: float = cx - total_w / 2.0 + slot * dot_spacing
-		var ct: int = _slot_colour(slot)
-		var col: Color = ColourData.get_color(ct)
-		draw_circle(Vector2(dot_x, dot_row_y + 10.0), 10.0, Color(col, 0.9))
-		draw_arc(Vector2(dot_x, dot_row_y + 10.0), 10.0, 0, TAU, 16,
-			Color(col.lightened(0.3), 1.0), 1.5)
-		# "YOU" label under player dot
-		if slot == 0:
-			var you_lbl := "YOU"
-			var yw := font.get_string_size(you_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
-			draw_string(font, Vector2(dot_x - yw / 2.0, dot_row_y + 28.0),
-				you_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(col, 0.9))
+	# Zone dot colour preview — only shown when selected map supports current count
+	var map_key_sel: String = MAP_KEYS[selected_map_index]
+	if GameConfig.MAP_VALID_PLAYERS[map_key_sel].has(num_players):
+		var dot_row_y: float = arr_y + arr_h + 14.0
+		var sides: Array = GameConfig.MAP_ZONE_SIDES[map_key_sel][num_players]
+		var dot_spacing: float = 30.0
+		var total_w: float = (sides.size() - 1) * dot_spacing
+		for slot in sides.size():
+			var dot_x: float = cx - total_w / 2.0 + slot * dot_spacing
+			var ct: int = _slot_colour(slot)
+			var col: Color = ColourData.get_color(ct)
+			draw_circle(Vector2(dot_x, dot_row_y + 10.0), 10.0, Color(col, 0.9))
+			draw_arc(Vector2(dot_x, dot_row_y + 10.0), 10.0, 0, TAU, 16,
+				Color(col.lightened(0.3), 1.0), 1.5)
+			# "YOU" label under player dot
+			if slot == 0:
+				var you_lbl := "YOU"
+				var yw := font.get_string_size(you_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+				draw_string(font, Vector2(dot_x - yw / 2.0, dot_row_y + 28.0),
+					you_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(col, 0.9))
+	else:
+		# Show a subtle "not supported" hint
+		var dot_row_y: float = arr_y + arr_h + 14.0
+		var hint := "not supported by selected map"
+		var hw := font.get_string_size(hint, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+		draw_string(font, Vector2(cx - hw / 2.0, dot_row_y + 14.0),
+			hint, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.45, 0.45, 0.52, 1.0))
 
 
 func _draw_arrow_button(rect: Rect2, label: String, hovered: bool, enabled: bool) -> void:
