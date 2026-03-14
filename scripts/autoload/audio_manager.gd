@@ -20,7 +20,7 @@ const GAME_TRACKS: Array = [
 ]
 
 const FADE_IN_DURATION:  float = 0.3   # seconds to fade a new track in
-const FADE_OUT_DURATION: float = 1.2   # seconds to fade the old track out
+const FADE_OUT_DURATION: float = 2.0   # seconds to fade the old track out
 
 # Two players for crossfading — one fades out while the other fades in.
 var _player_a: AudioStreamPlayer
