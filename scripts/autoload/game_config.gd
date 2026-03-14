@@ -46,11 +46,60 @@ const MODIFIERS: Array = [
 
 var selected_power_up: String = ""  # "", "gravity", "double_rebound"
 var active_modifiers: Array = []    # e.g. ["random_directions", "rotated_colours"]
+var selected_map: String = "square"
+var num_players: int = 4            # Total zones including player
+
+## Which polygon sides are active per (map, player-count). Side 0 = player (bottom).
+## All selections are symmetric around the vertical axis through side 0 where possible.
+const MAP_ZONE_SIDES: Dictionary = {
+	"triangle": {
+		3: [0, 1, 2],
+	},
+	"square": {
+		2: [0, 2],
+		3: [0, 1, 3],
+		4: [0, 1, 2, 3],
+	},
+	"pentagon": {
+		3: [0, 2, 3],           # Player bottom, two at top (upper-right + upper-left)
+		5: [0, 1, 2, 3, 4],
+	},
+	"hexagon": {
+		2: [0, 3],              # Opposite sides
+		3: [0, 2, 4],           # Alternating
+		6: [0, 1, 2, 3, 4, 5],
+	},
+	"heptagon": {
+		3: [0, 2, 5],           # Symmetric: 2 and 5 mirror about vertical axis
+		7: [0, 1, 2, 3, 4, 5, 6],
+	},
+	"octagon": {
+		2: [0, 4],
+		3: [0, 3, 5],
+		4: [0, 2, 4, 6],
+		5: [0, 1, 3, 5, 7],
+		6: [0, 1, 3, 4, 5, 7],
+		7: [0, 1, 2, 3, 5, 6, 7],
+		8: [0, 1, 2, 3, 4, 5, 6, 7],
+	},
+}
+
+## Valid player counts per map. Arrows on the map select screen step through these only.
+const MAP_VALID_PLAYERS: Dictionary = {
+	"triangle": [3],
+	"square":   [2, 3, 4],
+	"pentagon": [3, 5],
+	"hexagon":  [2, 3, 6],
+	"heptagon": [3, 7],
+	"octagon":  [2, 3, 4, 5, 6, 7, 8],
+}
 
 
 func reset() -> void:
 	selected_power_up = ""
 	active_modifiers = []
+	# selected_map and num_players are intentionally NOT reset here —
+	# they are set by the map select screen and should persist into the arena.
 
 
 func has_modifier(mod: String) -> bool:

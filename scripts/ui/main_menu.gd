@@ -84,7 +84,7 @@ func _activate(index: int) -> void:
 	match index:
 		0:
 			GameConfig.reset()
-			get_tree().change_scene_to_file("res://scenes/pre_game_config.tscn")
+			get_tree().change_scene_to_file("res://scenes/map_select.tscn")
 		1:
 			get_tree().change_scene_to_file("res://scenes/settings_screen.tscn")
 		2:

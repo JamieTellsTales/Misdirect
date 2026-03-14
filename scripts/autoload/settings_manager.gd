@@ -72,14 +72,20 @@ func _apply_display() -> void:
 	else:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 		var res: Vector2i = RESOLUTIONS[resolution_index]
-		DisplayServer.window_set_size(res)
-		# Centre the window on screen after resize
-		var screen_size: Vector2i = DisplayServer.screen_get_size()
-		var win_pos: Vector2i = Vector2i(
-			(screen_size.x - res.x) / 2,
-			(screen_size.y - res.y) / 2
-		)
-		DisplayServer.window_set_position(win_pos)
+		# Only reposition when the size actually changes — avoids snapping the window
+		# to the primary monitor every time an unrelated setting (e.g. volume) is previewed.
+		if DisplayServer.window_get_size() != res:
+			DisplayServer.window_set_size(res)
+			# Centre on whichever screen the window currently lives on, not screen 0.
+			var screen: int       = DisplayServer.window_get_current_screen()
+			var screen_pos: Vector2i  = DisplayServer.screen_get_position(screen)
+			var screen_size: Vector2i = DisplayServer.screen_get_size(screen)
+			DisplayServer.window_set_position(
+				screen_pos + Vector2i(
+					(screen_size.x - res.x) / 2,
+					(screen_size.y - res.y) / 2
+				)
+			)
 
 
 func _apply_audio() -> void:

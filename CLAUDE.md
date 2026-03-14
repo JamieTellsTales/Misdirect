@@ -4,12 +4,12 @@
 
 **Godot Executable Path (IMPORTANT - use this exact path):**
 ```
-C:\Users\jamie\OneDrive\Desktop\Godot\Godot_v4.5.1-stable_win64.exe
+C:\Users\jamie\OneDrive - Blakeman Online\Desktop\Godot\Godot_v4.5.1-stable_win64.exe
 ```
 
 To run the game:
 ```bash
-"C:\Users\jamie\OneDrive\Desktop\Godot\Godot_v4.5.1-stable_win64.exe" --path "C:\Users\jamie\Documents\Repos\Misdirect"
+"C:\Users\jamie\OneDrive - Blakeman Online\Desktop\Godot\Godot_v4.5.1-stable_win64.exe" --path "C:\Users\jamie\Documents\Repos\Misdirect"
 ```
 
 ## Project Overview
@@ -177,16 +177,16 @@ Misdirect/
 ### Running & Testing
 ```bash
 # Run the game
-"C:\Users\jamie\OneDrive\Desktop\Godot\Godot_v4.5.1-stable_win64.exe" --path .
+"C:\Users\jamie\OneDrive - Blakeman Online\Desktop\Godot\Godot_v4.5.1-stable_win64.exe" --path .
 
 # Validate a script
-"C:\Users\jamie\OneDrive\Desktop\Godot\Godot_v4.5.1-stable_win64.exe" --path . --check-only --script scripts/example.gd
+"C:\Users\jamie\OneDrive - Blakeman Online\Desktop\Godot\Godot_v4.5.1-stable_win64.exe" --path . --check-only --script scripts/example.gd
 
 # Run headless
-"C:\Users\jamie\OneDrive\Desktop\Godot\Godot_v4.5.1-stable_win64.exe" --path . --headless
+"C:\Users\jamie\OneDrive - Blakeman Online\Desktop\Godot\Godot_v4.5.1-stable_win64.exe" --path . --headless
 
 # Debug collisions (useful for paddle/ticket hitbox tuning)
-"C:\Users\jamie\OneDrive\Desktop\Godot\Godot_v4.5.1-stable_win64.exe" --path . --debug-collisions
+"C:\Users\jamie\OneDrive - Blakeman Online\Desktop\Godot\Godot_v4.5.1-stable_win64.exe" --path . --debug-collisions
 ```
 
 ### Git Workflow
