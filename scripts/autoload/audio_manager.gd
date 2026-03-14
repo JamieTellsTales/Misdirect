@@ -19,13 +19,22 @@ const GAME_TRACKS: Array = [
 	"res://assets/audio/Action & Dramatic Theme #10 (looped).wav",
 ]
 
-const FADE_DURATION: float = 1.5   # seconds for fade in / fade out
+const FADE_DURATION: float = 1.5   # seconds for crossfade
 
-var music_player: AudioStreamPlayer
-var sfx_player: AudioStreamPlayer
-var current_path: String  = ""
-var _pending_path: String = ""
-var _fade_tween: Tween    = null
+# Two players for crossfading — one fades out while the other fades in.
+var _player_a: AudioStreamPlayer
+var _player_b: AudioStreamPlayer
+var _active:   AudioStreamPlayer   # currently audible
+var _inactive: AudioStreamPlayer   # ready to receive next track
+
+# Keep music_player as an alias so any external callers still work.
+var music_player: AudioStreamPlayer :
+	get: return _active if _active else _player_a
+
+var sfx_player:  AudioStreamPlayer
+var current_path: String = ""
+var _tween_a: Tween = null
+var _tween_b: Tween = null
 
 # Pre-generated SFX streams — built once at startup to avoid mid-game stutter
 var _correct_stream: AudioStreamWAV
@@ -37,10 +46,18 @@ func _ready() -> void:
 	_ensure_music_bus()
 	_ensure_sfx_bus()
 
-	music_player = AudioStreamPlayer.new()
-	music_player.bus = "Music"
-	add_child(music_player)
-	music_player.finished.connect(_on_music_finished)
+	_player_a = AudioStreamPlayer.new()
+	_player_a.bus = "Music"
+	add_child(_player_a)
+	_player_a.finished.connect(_on_music_finished.bind(_player_a))
+
+	_player_b = AudioStreamPlayer.new()
+	_player_b.bus = "Music"
+	add_child(_player_b)
+	_player_b.finished.connect(_on_music_finished.bind(_player_b))
+
+	_active   = _player_a
+	_inactive = _player_b
 
 	sfx_player = AudioStreamPlayer.new()
 	sfx_player.bus = "SFX"
@@ -90,13 +107,11 @@ func play_game_music() -> void:
 
 
 func stop_music() -> void:
-	if music_player.playing:
-		_fade_out(func() -> void:
-			music_player.stop()
-			current_path = ""
-		)
-	else:
-		current_path = ""
+	current_path = ""
+	_kill_tween(_tween_a)
+	_kill_tween(_tween_b)
+	_tween_a = _tween_to(_player_a, -80.0, func() -> void: _player_a.stop())
+	_tween_b = _tween_to(_player_b, -80.0, func() -> void: _player_b.stop())
 
 
 func play_correct_catch() -> void:
@@ -119,58 +134,61 @@ func play_game_over() -> void:
 
 # ── Internal ─────────────────────────────────────────────────────────────────
 
-func _on_music_finished() -> void:
-	## Called when the track ends — restart it to loop continuously (no fade).
-	if current_path != "":
-		music_player.volume_db = 0.0
-		music_player.play()
+func _on_music_finished(player: AudioStreamPlayer) -> void:
+	## Loop the track that just finished — only if it's still the active one.
+	if player == _active and current_path != "":
+		player.volume_db = 0.0
+		player.play()
 
 
 func _play(path: String) -> void:
-	if current_path == path and music_player.playing:
+	if current_path == path and _active.playing:
 		return  # Already playing this track — don't restart it
 
-	if music_player.playing:
-		# Fade out the current track, then swap to the new one
-		_pending_path = path
-		_fade_out(_swap_to_pending)
-	else:
-		_start_track(path)
-
-
-func _start_track(path: String) -> void:
 	var stream := load(path) as AudioStreamWAV
 	if stream == null:
 		push_warning("AudioManager: could not load track: " + path)
 		return
 
-	current_path          = path
-	music_player.volume_db = -80.0
-	music_player.stream   = stream
-	music_player.play()
-	_fade_in()
+	current_path = path
+
+	# Start new track on the inactive player at silence and fade it in.
+	_inactive.volume_db = -80.0
+	_inactive.stream    = stream
+	_inactive.play()
+
+	# Fade inactive → full, active → silent (crossfade, both happen simultaneously).
+	var fading_out: AudioStreamPlayer = _active
+	var fading_in:  AudioStreamPlayer = _inactive
+
+	_kill_tween(_tween_a if fading_out == _player_a else _tween_b)
+	_kill_tween(_tween_a if fading_in  == _player_a else _tween_b)
+
+	var t_out: Tween = _tween_to(fading_out, -80.0, func() -> void: fading_out.stop())
+	var t_in:  Tween = _tween_to(fading_in,    0.0)
+
+	if fading_out == _player_a:
+		_tween_a = t_out;  _tween_b = t_in
+	else:
+		_tween_b = t_out;  _tween_a = t_in
+
+	# Swap active/inactive for the next transition.
+	_active   = fading_in
+	_inactive = fading_out
 
 
-func _fade_in() -> void:
-	if _fade_tween and _fade_tween.is_valid():
-		_fade_tween.kill()
-	_fade_tween = create_tween()
-	_fade_tween.tween_property(music_player, "volume_db", 0.0, FADE_DURATION)
-
-
-func _fade_out(on_done: Callable = Callable()) -> void:
-	if _fade_tween and _fade_tween.is_valid():
-		_fade_tween.kill()
-	_fade_tween = create_tween()
-	_fade_tween.tween_property(music_player, "volume_db", -80.0, FADE_DURATION)
+func _tween_to(player: AudioStreamPlayer, target_db: float,
+		on_done: Callable = Callable()) -> Tween:
+	var t: Tween = create_tween()
+	t.tween_property(player, "volume_db", target_db, FADE_DURATION)
 	if on_done.is_valid():
-		_fade_tween.tween_callback(on_done)
+		t.tween_callback(on_done)
+	return t
 
 
-func _swap_to_pending() -> void:
-	var path: String = _pending_path
-	_pending_path    = ""
-	_start_track(path)
+func _kill_tween(t: Tween) -> void:
+	if t and t.is_valid():
+		t.kill()
 
 
 func _generate_chord_stab() -> AudioStreamWAV:
