@@ -64,6 +64,7 @@ var is_game_over:      bool    = false
 
 
 func _ready() -> void:
+	AudioManager.play_game_music()
 	_build_active_colours()
 	_init_scores()
 	_setup_walls()

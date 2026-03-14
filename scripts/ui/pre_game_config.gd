@@ -30,9 +30,6 @@ var _pu_buy_rects: Array = []  # Array of {rect, id, price, index}
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-	# Pick a random game track now; it will carry through into the arena
-	# so the same track plays for the entire session without re-rolling.
-	AudioManager.play_game_music()
 
 
 func _process(_delta: float) -> void:
