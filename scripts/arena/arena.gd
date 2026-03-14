@@ -307,9 +307,9 @@ func _setup_paddles() -> void:
 		var min_off: float = -(half_zone - half_paddle)
 		var max_off: float =   half_zone - half_paddle
 		if prev_side in active_sides:
-			min_off += half_paddle
+			min_off += PADDLE_THICKNESS
 		if next_side in active_sides:
-			max_off -= half_paddle
+			max_off -= PADDLE_THICKNESS
 
 		# Paddle sits just inside the polygon edge, guarding the open zone side
 		var paddle_pos: Vector2 = edge_mid \
