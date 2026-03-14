@@ -28,6 +28,10 @@ func _ready() -> void:
 	add_to_group("paddles")
 	paddle_color = ColourData.get_color(colour_type)
 	_setup_collision_shape()
+	# Layer 4 (bit value 8): paddle–paddle collision only.
+	# Keeps paddle–ticket physics on lower layers unchanged.
+	collision_layer |= 8
+	collision_mask  |= 8
 	queue_redraw()
 
 

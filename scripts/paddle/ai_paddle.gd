@@ -136,12 +136,14 @@ func _calculate_target_offset() -> void:
 
 
 func _move_toward_target(delta: float) -> void:
-	var current_t := get_slide_offset()
-	var dir: float = sign(target_offset - current_t)
-	var dist: float = abs(target_offset - current_t)
+	var dist: float = target_offset - get_slide_offset()
 
-	if dist < 5.0:
+	if abs(dist) < 5.0:
+		velocity = Vector2.ZERO
 		return
 
-	var step: float = min(move_speed * delta, dist)
-	set_slide_offset(current_t + dir * step)
+	velocity = move_direction * sign(dist) * move_speed
+	move_and_slide()
+	# Snap back onto the constrained axis so collisions can't push us off-edge,
+	# but the along-edge position (collision-resolved) is preserved.
+	set_slide_offset(get_slide_offset())
