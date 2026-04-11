@@ -11,7 +11,9 @@ func _stats_path() -> String:
 
 var high_score:              int   = 0
 var total_score:             int   = 0
-var points:                  int   = 0     # Persistent currency for buying upgrades
+var tokens:                  int   = 0     # Persistent currency for buying upgrades
+var xp:                      int   = 0     # Total XP earned (100 XP = 1 level)
+var map_wins:                Dictionary = {} # Wins per map key e.g. {"triangle": 3}
 var games_played:            int   = 0
 var total_time_played:       float = 0.0   # Seconds (across all sessions)
 var wins:                    int   = 0
@@ -21,7 +23,9 @@ var powerups_unlocked:       int   = 0
 var modifiers_unlocked:      int   = 0
 var longest_endless_seconds: float = 0.0   # Populated when endless mode ships
 var unlocked_powerups:       Array = []    # IDs of purchased power-ups
-var last_power_up:           String = ""   # Last selected power-up, restored on next pre-game screen
+var unlocked_slots:          Array = []    # Slot indices (0-2) whose unlock fee has been paid
+var last_power_up:           String = ""   # Legacy single-slot; kept for compatibility
+var last_power_up_slots:     Array  = ["", "", ""]  # Last slot assignments, restored on pre-game screen
 var last_modifiers:          Array  = []   # Last selected modifiers, restored on next pre-game screen
 
 
@@ -36,7 +40,9 @@ func load_stats() -> void:
 	# doesn't leave the previous profile's data in memory.
 	high_score              = 0
 	total_score             = 0
-	points                  = 0
+	tokens                  = 0
+	xp                      = 0
+	map_wins                = {}
 	games_played            = 0
 	total_time_played       = 0.0
 	wins                    = 0
@@ -46,7 +52,9 @@ func load_stats() -> void:
 	modifiers_unlocked      = 0
 	longest_endless_seconds = 0.0
 	unlocked_powerups       = []
+	unlocked_slots          = []
 	last_power_up           = ""
+	last_power_up_slots     = ["", "", ""]
 	last_modifiers          = []
 
 	var config := ConfigFile.new()
@@ -55,7 +63,9 @@ func load_stats() -> void:
 
 	high_score              = config.get_value("stats", "high_score",              0)
 	total_score             = config.get_value("stats", "total_score",             0)
-	points                  = config.get_value("stats", "points",                  0)
+	tokens                  = config.get_value("stats", "tokens",                  0)
+	xp                      = config.get_value("stats", "xp",                      0)
+	map_wins                = config.get_value("stats", "map_wins",                {})
 	games_played            = config.get_value("stats", "games_played",            0)
 	total_time_played       = config.get_value("stats", "total_time_played",       0.0)
 	wins                    = config.get_value("stats", "wins",                    0)
@@ -65,7 +75,9 @@ func load_stats() -> void:
 	modifiers_unlocked      = config.get_value("stats", "modifiers_unlocked",      0)
 	longest_endless_seconds = config.get_value("stats", "longest_endless_seconds", 0.0)
 	unlocked_powerups       = config.get_value("stats", "unlocked_powerups",       [])
+	unlocked_slots          = config.get_value("stats", "unlocked_slots",          [])
 	last_power_up           = config.get_value("stats", "last_power_up",           "")
+	last_power_up_slots     = config.get_value("stats", "last_power_up_slots",     ["", "", ""])
 	last_modifiers          = config.get_value("stats", "last_modifiers",          [])
 
 
@@ -73,7 +85,9 @@ func save_stats() -> void:
 	var config := ConfigFile.new()
 	config.set_value("stats", "high_score",              high_score)
 	config.set_value("stats", "total_score",             total_score)
-	config.set_value("stats", "points",                  points)
+	config.set_value("stats", "tokens",                  tokens)
+	config.set_value("stats", "xp",                      xp)
+	config.set_value("stats", "map_wins",                map_wins)
 	config.set_value("stats", "games_played",            games_played)
 	config.set_value("stats", "total_time_played",       total_time_played)
 	config.set_value("stats", "wins",                    wins)
@@ -83,7 +97,9 @@ func save_stats() -> void:
 	config.set_value("stats", "modifiers_unlocked",      modifiers_unlocked)
 	config.set_value("stats", "longest_endless_seconds", longest_endless_seconds)
 	config.set_value("stats", "unlocked_powerups",       unlocked_powerups)
+	config.set_value("stats", "unlocked_slots",          unlocked_slots)
 	config.set_value("stats", "last_power_up",           last_power_up)
+	config.set_value("stats", "last_power_up_slots",     last_power_up_slots)
 	config.set_value("stats", "last_modifiers",          last_modifiers)
 	config.save(_stats_path())
 
@@ -92,13 +108,24 @@ func save_stats() -> void:
 
 func record_game_end(player_score: int, time_seconds: float, player_won: bool) -> Dictionary:
 	## Call once at the end of each round.
-	## Returns { "points_earned": int, "is_new_high_score": bool }
+	## Returns { "tokens_earned": int, "is_new_high_score": bool,
+	##           "xp_earned": int, "level_before": int, "level_after": int }
 	games_played      += 1
 	total_score       += player_score
 	total_time_played += time_seconds
 
+	# Capture level before XP is applied so the game over screen can show progression
+	var level_before: int = get_level()
+
+	# XP: 1 XP per score point earned (capped at level 999)
+	var xp_earned: int = player_score
+	xp = mini(xp + xp_earned, 999 * 100)
+
 	if player_won:
 		wins += 1
+		# Track wins per map for unlock progression
+		var map_key: String = GameConfig.selected_map
+		map_wins[map_key] = map_wins.get(map_key, 0) + 1
 	else:
 		losses += 1
 
@@ -106,14 +133,20 @@ func record_game_end(player_score: int, time_seconds: float, player_won: bool) -
 	if is_new_high_score:
 		high_score = player_score
 
-	# Points: 1 per 100 score; halved (integer division) on loss
-	var points_earned: int = player_score / 100
+	# Tokens: 1 per 100 score; halved (integer division) on loss
+	var tokens_earned: int = player_score / 100
 	if not player_won:
-		points_earned = points_earned / 2
-	points += points_earned
+		tokens_earned = tokens_earned / 2
+	tokens += tokens_earned
 
 	save_stats()
-	return { "points_earned": points_earned, "is_new_high_score": is_new_high_score }
+	return {
+		"tokens_earned":   tokens_earned,
+		"is_new_high_score": is_new_high_score,
+		"xp_earned":       xp_earned,
+		"level_before":    level_before,
+		"level_after":     get_level(),
+	}
 
 
 func win_loss_ratio() -> String:
@@ -123,6 +156,37 @@ func win_loss_ratio() -> String:
 	if losses == 0:
 		return "∞"
 	return "%.2f" % (float(wins) / float(losses))
+
+
+# ── XP & Levels ───────────────────────────────────────────────────────────────
+
+func get_level() -> int:
+	## Returns the current level (0–999). Each 100 XP = 1 level.
+	return mini(xp / 100, 999)
+
+
+func get_xp_in_level() -> int:
+	## Returns XP progress within the current level (0–99).
+	## At max level 999 returns 99 (bar stays full).
+	if get_level() >= 999:
+		return 99
+	return xp % 100
+
+
+# ── Map Unlocks ───────────────────────────────────────────────────────────────
+
+func is_map_unlocked(map_key: String) -> bool:
+	## Returns true if the player has unlocked the given map.
+	var req: Dictionary = GameConfig.MAP_UNLOCK_REQUIREMENTS.get(map_key, {})
+	if req.is_empty():
+		return false
+	var required_wins: int = req.get("wins", 0)
+	if required_wins == 0:
+		return true  # Triangle — always unlocked
+	var prev_map: String = req.get("prev", "")
+	if prev_map == "":
+		return true
+	return map_wins.get(prev_map, 0) >= required_wins
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -135,20 +199,44 @@ func is_powerup_unlocked(id: String) -> bool:
 
 
 func unlock_powerup(id: String, price: int) -> bool:
-	## Purchase a power-up. Returns true on success, false if already owned or insufficient points.
+	## Purchase a power-up. Returns true on success, false if already owned or insufficient tokens.
 	if id == "" or id in unlocked_powerups:
 		return false
-	if points < price:
+	if tokens < price:
 		return false
-	points -= price
+	tokens -= price
 	unlocked_powerups.append(id)
 	powerups_unlocked = unlocked_powerups.size()
 	save_stats()
 	return true
 
 
+func is_slot_unlocked(slot_idx: int) -> bool:
+	## Returns true if the player has paid the token fee to unlock this slot.
+	return slot_idx in unlocked_slots
+
+
+func unlock_slot(slot_idx: int, price: int) -> bool:
+	## Pay the token fee to unlock a slot. Returns true on success.
+	if slot_idx in unlocked_slots:
+		return false
+	if tokens < price:
+		return false
+	tokens -= price
+	unlocked_slots.append(slot_idx)
+	save_stats()
+	return true
+
+
+func save_last_slot_selections(slots: Array, modifiers: Array) -> void:
+	## Persist the player's last slot assignments and modifier choices for this profile.
+	last_power_up_slots = slots.duplicate()
+	last_modifiers      = modifiers.duplicate()
+	save_stats()
+
+
 func save_last_selections(power_up: String, modifiers: Array) -> void:
-	## Persist the player's last power-up and modifier choices for this profile.
+	## Legacy: persist single power-up selection. Kept for compatibility.
 	last_power_up  = power_up
 	last_modifiers = modifiers.duplicate()
 	save_stats()

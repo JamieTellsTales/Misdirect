@@ -93,6 +93,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
+	if event.is_action_pressed("ui_cancel"):
+		close()
+		get_viewport().set_input_as_handled()
+		return
+
 
 func _update_hover(pos: Vector2) -> void:
 	for i in range(item_rects.size()):
@@ -101,6 +106,7 @@ func _update_hover(pos: Vector2) -> void:
 				selected_index = i
 				show_achievements_soon = false
 				queue_redraw()
+				AudioManager.play_button_hover()
 			return
 
 
@@ -112,6 +118,7 @@ func _handle_click(pos: Vector2) -> void:
 
 
 func _activate(index: int) -> void:
+	AudioManager.play_button_click()
 	match index:
 		0:  # Continue
 			close()

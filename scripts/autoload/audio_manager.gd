@@ -33,6 +33,7 @@ var music_player: AudioStreamPlayer :
 	get: return _active if _active else _player_a
 
 var sfx_player:  AudioStreamPlayer
+var _ui_player:  AudioStreamPlayer   # Separate player so UI sounds don't cut game SFX
 var current_path: String = ""
 var _tween_a: Tween = null
 var _tween_b: Tween = null
@@ -41,6 +42,11 @@ var _tween_b: Tween = null
 var _correct_stream: AudioStreamWAV
 var _wrong_stream: AudioStreamWAV
 var _game_over_stream: AudioStreamWAV
+var _victory_stream: AudioStreamWAV
+var _defeat_stream: AudioStreamWAV
+var _hover_stream: AudioStreamWAV
+var _click_stream: AudioStreamWAV
+var _level_up_stream: AudioStreamWAV
 
 
 func _ready() -> void:
@@ -64,12 +70,26 @@ func _ready() -> void:
 	sfx_player.bus = "SFX"
 	add_child(sfx_player)
 
+	_ui_player = AudioStreamPlayer.new()
+	_ui_player.bus = "SFX"
+	add_child(_ui_player)
+
 	# Rising ping — pleasant "correct" sound (500 → 1500 Hz, clean sine)
 	_correct_stream   = _generate_sweep(500.0, 1500.0, 0.25, 0.45, false)
 	# Descending buzz — harsh "wrong" sound (420 → 120 Hz, + 3rd harmonic)
 	_wrong_stream     = _generate_sweep(420.0, 120.0,  0.35, 0.45, true)
 	# Dramatic minor chord stab — game over hit
 	_game_over_stream = _generate_chord_stab()
+	# Ascending major arpeggio — victory fanfare (C5→E5→G5→C6)
+	_victory_stream   = _generate_arpeggio([523.25, 659.25, 783.99, 1046.5], 0.6, 0.5)
+	# Descending minor slide — defeat sting (G4→F4→Eb4→C4)
+	_defeat_stream    = _generate_arpeggio([392.0, 349.23, 311.13, 261.63], 0.7, 0.4)
+	# Very short blip — button hover indicator
+	_hover_stream     = _generate_arpeggio([1200.0], 0.04, 0.1)
+	# Quick two-tone click — button press confirmation
+	_click_stream     = _generate_arpeggio([700.0, 1300.0], 0.07, 0.22)
+	# Rising three-note chime — level up celebration (D5→F#5→B5)
+	_level_up_stream  = _generate_arpeggio([587.33, 739.99, 987.77], 0.35, 0.45)
 
 
 func _ensure_music_bus() -> void:
@@ -133,6 +153,36 @@ func play_game_over() -> void:
 	sfx_player.play()
 
 
+func play_victory() -> void:
+	## Play the ascending major-arpeggio fanfare when the player wins.
+	sfx_player.stream = _victory_stream
+	sfx_player.play()
+
+
+func play_defeat() -> void:
+	## Play the descending minor arpeggio when the player loses or zone collapses.
+	sfx_player.stream = _defeat_stream
+	sfx_player.play()
+
+
+func play_button_hover() -> void:
+	## Play a short blip when the mouse moves onto a button.
+	_ui_player.stream = _hover_stream
+	_ui_player.play()
+
+
+func play_button_click() -> void:
+	## Play a quick two-tone click when a button is activated.
+	_ui_player.stream = _click_stream
+	_ui_player.play()
+
+
+func play_level_up() -> void:
+	## Play the rising three-note chime when the player levels up on the results screen.
+	_ui_player.stream = _level_up_stream
+	_ui_player.play()
+
+
 # ── Internal ─────────────────────────────────────────────────────────────────
 
 func _on_music_finished(player: AudioStreamPlayer) -> void:
@@ -190,6 +240,44 @@ func _tween_to(player: AudioStreamPlayer, target_db: float, duration: float,
 func _kill_tween(t: Tween) -> void:
 	if t and t.is_valid():
 		t.kill()
+
+
+func _generate_arpeggio(freqs: Array, total_duration: float, volume: float) -> AudioStreamWAV:
+	## Generate a short sequential arpeggio — each note plays for an equal slice of
+	## total_duration with a quick attack and smooth decay. freqs is an Array of float Hz.
+	var sample_rate: int  = 44100
+	var num_samples: int  = int(sample_rate * total_duration)
+	var data := PackedByteArray()
+	data.resize(num_samples * 2)
+
+	var note_count: int    = freqs.size()
+	var note_len: int      = num_samples / note_count  # samples per note
+
+	for note_idx in range(note_count):
+		var freq: float  = float(freqs[note_idx])
+		var phase: float = 0.0
+		var start: int   = note_idx * note_len
+		var end: int     = start + note_len if note_idx < note_count - 1 else num_samples
+
+		for i in range(start, end):
+			var local_t: float  = float(i - start) / float(end - start)
+			# 10 ms attack, then smooth exponential decay
+			var attack: float   = minf(float(i - start) / (sample_rate * 0.01), 1.0)
+			var envelope: float = attack * pow(1.0 - local_t, 1.4)
+
+			var sample: float = sin(phase) * volume * envelope
+			phase += freq * TAU / float(sample_rate)
+
+			var value: int = clampi(int(sample * 32767.0), -32768, 32767)
+			data[i * 2]     = value & 0xFF
+			data[i * 2 + 1] = (value >> 8) & 0xFF
+
+	var stream := AudioStreamWAV.new()
+	stream.format   = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = sample_rate
+	stream.stereo   = false
+	stream.data     = data
+	return stream
 
 
 func _generate_chord_stab() -> AudioStreamWAV:

@@ -2,6 +2,8 @@ extends Node2D
 class_name MainMenu
 ## Title screen — drawn entirely in _draw(), consistent with rest of codebase
 
+const CornerHUD = preload("res://scripts/ui/corner_hud.gd")
+
 const ARENA_WIDTH: float = 1280.0
 const ARENA_HEIGHT: float = 720.0
 
@@ -17,6 +19,7 @@ const MENU_COLORS: Array = [
 
 var selected_index: int = 0
 var popup_state: int = 0  # 0 = none, 4 = achievements
+var _prev_selected_index: int = -1
 
 var title_pulse: float = 0.0
 var item_rects: Array = []  # Rect2 per menu item for mouse hit-testing
@@ -66,7 +69,9 @@ func _update_hover(pos: Vector2) -> void:
 	_badge_hovered = _badge_rect.has_point(pos)
 	for i in range(item_rects.size()):
 		if item_rects[i].has_point(pos):
-			selected_index = i
+			if selected_index != i:
+				selected_index = i
+				AudioManager.play_button_hover()
 			return
 
 
@@ -81,6 +86,7 @@ func _handle_click(pos: Vector2) -> void:
 
 
 func _activate(index: int) -> void:
+	AudioManager.play_button_click()
 	match index:
 		0:
 			GameConfig.reset()
@@ -104,6 +110,7 @@ func _draw() -> void:
 	_draw_profile_badge()
 	if popup_state != 0:
 		_draw_popup()
+	CornerHUD.draw_on(self)
 
 
 func _draw_background() -> void:

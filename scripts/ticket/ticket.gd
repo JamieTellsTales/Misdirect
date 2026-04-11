@@ -4,7 +4,9 @@ class_name Ball
 
 const ColourData = preload("res://scripts/resources/department_data.gd")
 
-signal request_split(ball: RigidBody2D, count: int)
+## spread_angle: half-angle (radians) of velocity divergence between split children.
+## Use a small value (e.g. 0.05) for near-identical clones, PI/5 for wide splits.
+signal request_split(ball: RigidBody2D, count: int, spread_angle: float)
 
 @export var ball_color: Color = Color.DODGER_BLUE
 @export var base_speed: float = 300.0
@@ -93,11 +95,23 @@ func _on_body_entered(body: Node) -> void:
 		if "velocity" in body:
 			linear_velocity += body.velocity * 0.5
 
-		# Double Rebound power up: split when hitting the player paddle
-		if can_split and split_cooldown <= 0.0 and body.is_in_group("player_paddle"):
-			if GameConfig.selected_power_up == "double_rebound":
-				split_cooldown = 0.5
-				request_split.emit(self, 2)
+		if body.is_in_group("player_paddle"):
+			# ── Railgun: blast the ball out at high speed ─────────────────
+			if GameConfig.has_power_up_in_slot("railgun"):
+				var boosted_speed: float = max_speed * speed_multiplier * 1.8
+				linear_velocity = linear_velocity.normalized() * boosted_speed
+
+			# ── Split power-ups (first matching slot wins) ────────────────
+			if can_split and split_cooldown <= 0.0:
+				if GameConfig.has_power_up_in_slot("multi_shot"):
+					split_cooldown = 0.5
+					request_split.emit(self, randi_range(2, 5), PI / 5.0)
+				elif GameConfig.has_power_up_in_slot("clone"):
+					split_cooldown = 0.5
+					request_split.emit(self, 2, 0.05)
+				elif GameConfig.has_power_up_in_slot("double_rebound"):
+					split_cooldown = 0.5
+					request_split.emit(self, 2, PI / 5.0)
 
 
 func _draw() -> void:

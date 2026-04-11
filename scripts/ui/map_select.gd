@@ -4,6 +4,7 @@ extends Node2D
 ## All drawing via _draw() — no Control nodes.
 
 const ColourData = preload("res://scripts/resources/department_data.gd")
+const CornerHUD  = preload("res://scripts/ui/corner_hud.gd")
 
 const ARENA_WIDTH:  float = 1280.0
 const ARENA_HEIGHT: float = 720.0
@@ -36,6 +37,7 @@ var num_players: int = 4
 
 var hover_section: String = ""
 var hover_index:   int    = -1
+var _prev_hover: String   = ""
 
 var _card_rects:        Array = []   # [Rect2 × 3]
 var _arrow_left_rect:   Rect2 = Rect2()
@@ -46,10 +48,14 @@ var _next_rect:         Rect2 = Rect2()
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-	# Restore any previously chosen map/count from GameConfig
+	# Restore any previously chosen map/count from GameConfig, falling back to
+	# triangle (always unlocked) if the saved map is no longer accessible.
 	var key_idx := MAP_KEYS.find(GameConfig.selected_map)
-	if key_idx >= 0:
+	if key_idx >= 0 and StatsManager.is_map_unlocked(MAP_KEYS[key_idx]):
 		selected_map_index = key_idx
+	else:
+		selected_map_index = 0
+		GameConfig.selected_map = "triangle"
 	num_players = GameConfig.num_players
 	_clamp_players()
 
@@ -75,8 +81,9 @@ func _update_hover(pos: Vector2) -> void:
 
 	for i in _card_rects.size():
 		if _card_rects[i].has_point(pos):
-			hover_section = "card"
-			hover_index   = i
+			if StatsManager.is_map_unlocked(MAP_KEYS[i]):
+				hover_section = "card"
+				hover_index   = i
 			return
 
 	if _arrow_left_rect.has_point(pos):
@@ -88,31 +95,41 @@ func _update_hover(pos: Vector2) -> void:
 	elif _back_rect.has_point(pos):
 		hover_section = "back"
 
+	if hover_section != _prev_hover and hover_section != "":
+		AudioManager.play_button_hover()
+	_prev_hover = hover_section
+
 
 func _handle_click(pos: Vector2) -> void:
 	for i in _card_rects.size():
 		if _card_rects[i].has_point(pos):
-			selected_map_index = i
-			_clamp_players()
+			if StatsManager.is_map_unlocked(MAP_KEYS[i]):
+				AudioManager.play_button_click()
+				selected_map_index = i
+				_clamp_players()
 			return
 
 	if _arrow_left_rect.has_point(pos):
 		if num_players > 2:
+			AudioManager.play_button_click()
 			num_players -= 1
 		return
 
 	if _arrow_right_rect.has_point(pos):
 		if num_players < 8:
+			AudioManager.play_button_click()
 			num_players += 1
 		return
 
 	if _next_rect.has_point(pos):
+		AudioManager.play_button_click()
 		GameConfig.selected_map = MAP_KEYS[selected_map_index]
 		GameConfig.num_players  = num_players
 		get_tree().change_scene_to_file("res://scenes/pre_game_config.tscn")
 		return
 
 	if _back_rect.has_point(pos):
+		AudioManager.play_button_click()
 		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 		return
 
@@ -189,14 +206,17 @@ func _draw_cards() -> void:
 			Vector2(CARD_W, CARD_H))
 		_card_rects.append(rect)
 
-		var is_selected:   bool = (i == selected_map_index)
-		var is_hovered:    bool = (hover_section == "card" and hover_index == i)
 		var map_key: String    = MAP_KEYS[i]
+		var is_locked: bool    = not StatsManager.is_map_unlocked(map_key)
+		var is_selected: bool  = (i == selected_map_index)
+		var is_hovered: bool   = (hover_section == "card" and hover_index == i)
 		var supported: bool    = GameConfig.MAP_VALID_PLAYERS[map_key].has(num_players)
 
 		# Card background
 		var bg_col: Color
-		if not supported:
+		if is_locked:
+			bg_col = Color(0.05, 0.05, 0.08, 1.0)
+		elif not supported:
 			bg_col = Color(0.06, 0.06, 0.09, 1.0)
 		elif is_selected:
 			bg_col = Color(0.1, 0.18, 0.28, 1.0)
@@ -208,7 +228,9 @@ func _draw_cards() -> void:
 
 		# Border
 		var brd_col: Color
-		if not supported:
+		if is_locked:
+			brd_col = Color(0.2, 0.18, 0.22, 0.35)
+		elif not supported:
 			brd_col = Color(0.18, 0.18, 0.22, 0.5)
 		elif is_selected:
 			brd_col = Color(0.35, 0.65, 1.0, 1.0)
@@ -218,14 +240,16 @@ func _draw_cards() -> void:
 			brd_col = Color(0.25, 0.25, 0.38, 0.6)
 		draw_rect(rect, brd_col, false, 2.5 if is_selected else 1.5)
 
-		# Polygon preview
-		_draw_map_preview(centre + Vector2(0, -20), map_key, supported)
+		# Polygon preview — dimmed for locked, hidden when count not supported
+		_draw_map_preview(centre + Vector2(0, -20), map_key, not is_locked and supported, is_locked)
 
-		# Label
+		# Label (map name)
 		var lbl: String = MAP_NAMES[i]
 		var lsz: int = 20 if is_selected else 17
 		var lc: Color
-		if not supported:
+		if is_locked:
+			lc = Color(0.3, 0.28, 0.34, 1.0)
+		elif not supported:
 			lc = Color(0.35, 0.35, 0.42, 1.0)
 		elif is_selected:
 			lc = Color.WHITE
@@ -234,6 +258,26 @@ func _draw_cards() -> void:
 		var lw := font.get_string_size(lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, lsz).x
 		draw_string(font, Vector2(centre.x - lw / 2.0, rect.position.y + CARD_H - 10.0),
 			lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, lsz, lc)
+
+		# Lock overlay: "LOCKED" + unlock hint
+		if is_locked:
+			var req: Dictionary   = GameConfig.MAP_UNLOCK_REQUIREMENTS.get(map_key, {})
+			var req_wins: int     = req.get("wins", 0)
+			var prev_key: String  = req.get("prev", "")
+			var done_wins: int    = StatsManager.map_wins.get(prev_key, 0)
+			var prev_name: String = prev_key.capitalize()
+
+			var lock_lbl := "LOCKED"
+			var ll_sz: int = 13
+			var ll_w := font.get_string_size(lock_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, ll_sz).x
+			draw_string(font, Vector2(centre.x - ll_w / 2.0, rect.position.y + CARD_H - 52.0),
+				lock_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, ll_sz, Color(0.65, 0.5, 0.2, 0.9))
+
+			var hint := "%d / %d wins on %s" % [done_wins, req_wins, prev_name]
+			var hl_sz: int = 11
+			var hl_w := font.get_string_size(hint, HORIZONTAL_ALIGNMENT_LEFT, -1, hl_sz).x
+			draw_string(font, Vector2(centre.x - hl_w / 2.0, rect.position.y + CARD_H - 36.0),
+				hint, HORIZONTAL_ALIGNMENT_LEFT, -1, hl_sz, Color(0.5, 0.42, 0.28, 0.8))
 
 
 
@@ -282,7 +326,7 @@ func _get_preview_verts(map_key: String) -> PackedVector2Array:
 			])
 
 
-func _draw_map_preview(centre: Vector2, map_key: String, supported: bool) -> void:
+func _draw_map_preview(centre: Vector2, map_key: String, supported: bool, locked: bool = false) -> void:
 	## Draws the polygon outline and coloured zone dots for the current player count.
 	var verts: PackedVector2Array = _get_preview_verts(map_key)
 	var n: int = verts.size()
@@ -293,7 +337,13 @@ func _draw_map_preview(centre: Vector2, map_key: String, supported: bool) -> voi
 		poly.append(centre + v)
 	var outline := poly.duplicate()
 	outline.append(poly[0])
-	var outline_col: Color = Color(0.5, 0.55, 0.75, 0.85) if supported else Color(0.25, 0.25, 0.32, 0.5)
+	var outline_col: Color
+	if locked:
+		outline_col = Color(0.28, 0.26, 0.32, 0.45)
+	elif supported:
+		outline_col = Color(0.5, 0.55, 0.75, 0.85)
+	else:
+		outline_col = Color(0.25, 0.25, 0.32, 0.5)
 	draw_polyline(outline, outline_col, 1.5)
 
 	# Zone dots — only shown when this map supports the current player count.
@@ -430,3 +480,5 @@ func _draw_bottom_buttons() -> void:
 	var bk_w2 := font.get_string_size(bk_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, bk_sz).x
 	draw_string(font, Vector2(_back_rect.position.x + (bk_w - bk_w2) / 2.0, by + 23.0),
 		bk_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, bk_sz, Color(0.75, 0.75, 0.85, 1.0))
+
+	CornerHUD.draw_on(self)

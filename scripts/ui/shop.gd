@@ -1,7 +1,9 @@
 extends Node2D
 class_name ShopScreen
-## Shop — purchase power-ups with earned points.
+## Shop — purchase power-ups with earned tokens.
 ## Card grid layout: add entries to GameConfig.POWER_UPS to extend the shop automatically.
+
+const CornerHUD = preload("res://scripts/ui/corner_hud.gd")
 
 const ARENA_WIDTH:  float = 1280.0
 const ARENA_HEIGHT: float = 720.0
@@ -13,6 +15,7 @@ const COLS:     int   = 2
 
 var _buy_rects: Array = []  # Array of {rect: Rect2, id: String, price: int}
 var _back_rect: Rect2 = Rect2()
+var _hover_rect_id: String = ""   # tracks which rect is hovered for sound
 
 
 func _ready() -> void:
@@ -25,20 +28,40 @@ func _process(_delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
+		AudioManager.play_button_click()
 		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 		return
+
+	if event is InputEventMouseMotion:
+		_update_hover(event.position)
 
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_handle_click(event.position)
 
 
+func _update_hover(pos: Vector2) -> void:
+	var new_id: String = ""
+	if _back_rect.has_point(pos):
+		new_id = "__back"
+	else:
+		for entry in _buy_rects:
+			if entry.rect.has_point(pos):
+				new_id = entry.id
+				break
+	if new_id != _hover_rect_id and new_id != "":
+		AudioManager.play_button_hover()
+	_hover_rect_id = new_id
+
+
 func _handle_click(pos: Vector2) -> void:
 	if _back_rect.has_point(pos):
+		AudioManager.play_button_click()
 		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 		return
 
 	for entry in _buy_rects:
 		if entry.rect.has_point(pos):
+			AudioManager.play_button_click()
 			StatsManager.unlock_powerup(entry.id, entry.price)
 			return
 
@@ -82,8 +105,8 @@ func _draw() -> void:
 	draw_string(font, Vector2(cx - title_w / 2.0, py + 50.0),
 		title, HORIZONTAL_ALIGNMENT_LEFT, -1, title_size, Color.WHITE)
 
-	# Points balance (top-right of panel)
-	var pts_text := "%d pts available" % StatsManager.points
+	# Tokens balance (top-right of panel)
+	var pts_text := "%d tokens available" % StatsManager.tokens
 	var pts_size := 17
 	var pts_w    := font.get_string_size(pts_text, HORIZONTAL_ALIGNMENT_LEFT, -1, pts_size).x
 	draw_string(font, Vector2(px + panel_w - pts_w - 20.0, py + 50.0),
@@ -124,10 +147,12 @@ func _draw() -> void:
 	draw_string(font, Vector2(cx - hint_w / 2.0, ARENA_HEIGHT - 24.0),
 		hint, HORIZONTAL_ALIGNMENT_LEFT, -1, hint_size, Color(0.3, 0.3, 0.38, 1.0))
 
+	CornerHUD.draw_on(self)
+
 
 func _draw_card(font: Font, pu: Dictionary, x: float, y: float) -> void:
 	var owned:      bool = StatsManager.is_powerup_unlocked(pu["id"])
-	var can_afford: bool = StatsManager.points >= pu["price"]
+	var can_afford: bool = StatsManager.tokens >= pu["price"]
 
 	# Card background + border
 	var card_bg    := Color(0.13, 0.14, 0.22, 1.0) if owned else Color(0.1, 0.1, 0.16, 1.0)
@@ -161,7 +186,7 @@ func _draw_card(font: Font, pu: Dictionary, x: float, y: float) -> void:
 			badge, HORIZONTAL_ALIGNMENT_LEFT, -1, badge_size, Color(0.35, 0.9, 0.45, 1.0))
 	else:
 		# Price
-		var price_text := "%d pts" % pu["price"]
+		var price_text := "%d tokens" % pu["price"]
 		var price_size := 16
 		var price_col  := Color(0.95, 0.82, 0.3, 1.0) if can_afford else Color(0.5, 0.5, 0.52, 1.0)
 		draw_string(font, Vector2(x + 14, y + CARD_H - 16),

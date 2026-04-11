@@ -2,30 +2,37 @@ extends Node2D
 ## Profile selection screen — switch, rename, delete, or create profiles.
 ## All drawing done via _draw() consistent with the rest of the UI codebase.
 
+const CornerHUD = preload("res://scripts/ui/corner_hud.gd")
+
 const ARENA_WIDTH:  float = 1280.0
 const ARENA_HEIGHT: float = 720.0
 const COL_LEFT:     float = 180.0
 const COL_RIGHT:    float = ARENA_WIDTH - 180.0
-const CARD_H:       float = 84.0
+const CARD_H:       float = 96.0
 const CARD_GAP:     float = 16.0
 const MAX_NAME:     int   = 20
+const HEADER_H:     float = 100.0   # fixed header height
+const FOOTER_H:     float = 80.0    # fixed footer height
+const SCROLL_SPEED: float = 32.0
 
 # ── State ─────────────────────────────────────────────────────────────────────
 
-var _confirm_delete_id: String = ""  # Profile pending delete confirmation
-var _rename_id:         String = ""  # Profile currently being renamed
-var _rename_text:       String = ""  # Working rename text
+var _confirm_delete_id: String = ""
+var _rename_id:         String = ""
+var _rename_text:       String = ""
 var _rename_cursor_timer:   float = 0.0
 var _rename_cursor_visible: bool  = true
 
 # Mouse hover
 var hover_section: String = ""
 var hover_index:   int    = -1
+var _prev_hover_section: String = ""
+var _prev_hover_index:   int    = -1
 
 # Rects populated each draw call
 var _select_rects:       Array = []
 var _delete_rects:       Array = []
-var _rename_rects:       Array = []  # One per profile (all can be renamed)
+var _rename_rects:       Array = []
 var _confirm_yes_rect:   Rect2 = Rect2()
 var _confirm_no_rect:    Rect2 = Rect2()
 var _rename_save_rect:   Rect2 = Rect2()
@@ -33,7 +40,18 @@ var _rename_cancel_rect: Rect2 = Rect2()
 var _new_profile_rect:   Rect2 = Rect2()
 var _back_rect:          Rect2 = Rect2()
 
-# Stats cache: id -> {wins, losses, points}
+# Scroll
+var _scroll_offset: float = 0.0
+
+# Drag reorder
+var _mouse_down:       bool    = false
+var _mouse_down_pos:   Vector2 = Vector2.ZERO
+var _drag_profile_idx: int     = -1
+var _drag_current_pos: Vector2 = Vector2.ZERO
+var _drag_active:      bool    = false
+var _drag_insert_idx:  int     = -1
+
+# Stats cache: id -> {wins, losses, tokens, level, xp_in}
 var _stats_cache: Dictionary = {}
 
 
@@ -51,8 +69,14 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
+func _max_scroll() -> float:
+	var scroll_area_h: float = ARENA_HEIGHT - HEADER_H - FOOTER_H
+	var content_h: float = float(ProfileManager.profiles.size()) * (CARD_H + CARD_GAP)
+	return maxf(0.0, content_h - scroll_area_h)
+
+
 func _unhandled_input(event: InputEvent) -> void:
-	# ── Rename text input ─────────────────────────────────────────────────────
+	# ── Rename text input ──────────────────────────────────────────────────────
 	if not _rename_id.is_empty():
 		if event is InputEventKey and event.pressed:
 			if event.keycode == KEY_ESCAPE or event.physical_keycode == KEY_ESCAPE:
@@ -75,17 +99,110 @@ func _unhandled_input(event: InputEvent) -> void:
 					_rename_cursor_visible = true
 					_rename_cursor_timer = 0.0
 			return  # Eat all other key input while renaming
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			_handle_click(event.position)
+		return
 
-	# ── Normal navigation ─────────────────────────────────────────────────────
+	# ── Mouse wheel scroll ─────────────────────────────────────────────────────
+	if event is InputEventMouseButton and event.pressed:
+		match event.button_index:
+			MOUSE_BUTTON_WHEEL_UP:
+				_scroll_offset = maxf(0.0, _scroll_offset - SCROLL_SPEED * 3)
+				return
+			MOUSE_BUTTON_WHEEL_DOWN:
+				_scroll_offset = minf(_max_scroll(), _scroll_offset + SCROLL_SPEED * 3)
+				return
+
+	# ── Mouse button press / release ───────────────────────────────────────────
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_on_mouse_down(event.position)
+		else:
+			_on_mouse_up(event.position)
+		return
+
+	# ── Mouse motion ───────────────────────────────────────────────────────────
 	if event is InputEventMouseMotion:
 		_update_hover(event.position)
-
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_handle_click(event.position)
+		_update_drag(event.position)
 		return
 
 	if event.is_action_pressed("ui_cancel"):
 		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+
+
+func _on_mouse_down(pos: Vector2) -> void:
+	if not _confirm_delete_id.is_empty():
+		_handle_click(pos)
+		return
+	_mouse_down       = true
+	_mouse_down_pos   = pos
+	_drag_active      = false
+	_drag_profile_idx = _card_index_at(pos)
+
+
+func _on_mouse_up(pos: Vector2) -> void:
+	if _drag_active and _drag_profile_idx >= 0:
+		_commit_drag_reorder()
+	else:
+		_handle_click(pos)
+	_mouse_down       = false
+	_drag_active      = false
+	_drag_profile_idx = -1
+	_drag_insert_idx  = -1
+	queue_redraw()
+
+
+func _update_drag(pos: Vector2) -> void:
+	if not _mouse_down or _drag_profile_idx < 0:
+		return
+	if not _drag_active:
+		if pos.distance_to(_mouse_down_pos) > 6.0:
+			_drag_active = true
+	if _drag_active:
+		_drag_current_pos = pos
+		_drag_insert_idx  = _insert_idx_at(pos)
+		queue_redraw()
+
+
+func _card_index_at(pos: Vector2) -> int:
+	if pos.y < HEADER_H or pos.y > ARENA_HEIGHT - FOOTER_H:
+		return -1
+	var content_y: float = pos.y + _scroll_offset - HEADER_H
+	if content_y < 0.0:
+		return -1
+	var idx: int = int(content_y / (CARD_H + CARD_GAP))
+	if idx < 0 or idx >= ProfileManager.profiles.size():
+		return -1
+	var card_top: float = HEADER_H + float(idx) * (CARD_H + CARD_GAP) - _scroll_offset
+	if pos.y >= card_top and pos.y <= card_top + CARD_H:
+		return idx
+	return -1
+
+
+func _insert_idx_at(pos: Vector2) -> int:
+	var content_y: float = pos.y + _scroll_offset - HEADER_H
+	var n: int = ProfileManager.profiles.size()
+	for i in range(n):
+		var mid_y: float = float(i) * (CARD_H + CARD_GAP) + (CARD_H + CARD_GAP) / 2.0
+		if content_y < mid_y:
+			return i
+	return n
+
+
+func _commit_drag_reorder() -> void:
+	var n: int    = ProfileManager.profiles.size()
+	var from_idx: int = _drag_profile_idx
+	var to_idx:   int = _drag_insert_idx  # may be 0..n (n = insert at end)
+	if to_idx > from_idx:
+		to_idx -= 1
+	to_idx = clampi(to_idx, 0, n - 1)  # clamp after adjustment
+	if to_idx == from_idx:
+		return
+	var item = ProfileManager.profiles[from_idx]
+	ProfileManager.profiles.remove_at(from_idx)
+	ProfileManager.profiles.insert(to_idx, item)
+	ProfileManager._save_index()
 
 
 func _is_allowed_char(ch: String) -> bool:
@@ -105,10 +222,14 @@ func _commit_rename() -> void:
 
 
 func _update_hover(pos: Vector2) -> void:
+	if _drag_active:
+		hover_section = ""
+		hover_index   = -1
+		return
+
 	hover_section = ""
 	hover_index   = -1
 
-	# Rename inline buttons
 	if not _rename_id.is_empty():
 		if _rename_save_rect.has_point(pos):
 			hover_section = "rename_save"
@@ -116,7 +237,6 @@ func _update_hover(pos: Vector2) -> void:
 			hover_section = "rename_cancel"
 		return
 
-	# Delete confirm buttons
 	if not _confirm_delete_id.is_empty():
 		if _confirm_yes_rect.has_point(pos):
 			hover_section = "confirm_yes"
@@ -125,12 +245,10 @@ func _update_hover(pos: Vector2) -> void:
 			hover_section = "confirm_no"
 			return
 
-	# Per-profile buttons
 	var non_active_i: int = 0
 	for i in ProfileManager.profiles.size():
 		var p: Dictionary = ProfileManager.profiles[i]
 		var is_active: bool = p["id"] == ProfileManager.active_id
-		# Rename available on all profiles
 		if i < _rename_rects.size() and _rename_rects[i].has_point(pos):
 			hover_section = "rename"
 			hover_index   = i
@@ -151,37 +269,44 @@ func _update_hover(pos: Vector2) -> void:
 	elif _back_rect.has_point(pos):
 		hover_section = "back"
 
+	if hover_section != "" and (hover_section != _prev_hover_section or hover_index != _prev_hover_index):
+		AudioManager.play_button_hover()
+	_prev_hover_section = hover_section
+	_prev_hover_index   = hover_index
+
 
 func _handle_click(pos: Vector2) -> void:
-	# Rename confirm / cancel
 	if not _rename_id.is_empty():
 		if _rename_save_rect.has_point(pos):
+			AudioManager.play_button_click()
 			_commit_rename()
 		elif _rename_cancel_rect.has_point(pos):
+			AudioManager.play_button_click()
 			_rename_id = ""
 			_rename_text = ""
 		return
 
-	# Delete confirm / cancel
 	if not _confirm_delete_id.is_empty():
 		if _confirm_yes_rect.has_point(pos):
+			AudioManager.play_button_click()
 			ProfileManager.delete_profile(_confirm_delete_id)
 			_confirm_delete_id = ""
 			_load_stats_cache()
 			return
 		if _confirm_no_rect.has_point(pos):
+			AudioManager.play_button_click()
 			_confirm_delete_id = ""
 			return
 		_confirm_delete_id = ""
 		return
 
-	# Per-profile buttons
 	var non_active_i: int = 0
 	for i in ProfileManager.profiles.size():
 		var p: Dictionary   = ProfileManager.profiles[i]
 		var is_active: bool = p["id"] == ProfileManager.active_id
 
 		if i < _rename_rects.size() and _rename_rects[i].has_point(pos):
+			AudioManager.play_button_click()
 			_rename_id   = p["id"]
 			_rename_text = p["name"]
 			_rename_cursor_visible = true
@@ -190,18 +315,22 @@ func _handle_click(pos: Vector2) -> void:
 
 		if not is_active:
 			if non_active_i < _select_rects.size() and _select_rects[non_active_i].has_point(pos):
+				AudioManager.play_button_click()
 				ProfileManager.switch_profile(p["id"])
 				get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 				return
 			if non_active_i < _delete_rects.size() and _delete_rects[non_active_i].has_point(pos):
 				if ProfileManager.can_delete(p["id"]):
+					AudioManager.play_button_click()
 					_confirm_delete_id = p["id"]
 				return
 			non_active_i += 1
 
 	if _new_profile_rect.has_point(pos):
+		AudioManager.play_button_click()
 		get_tree().change_scene_to_file("res://scenes/profile_setup.tscn")
 	elif _back_rect.has_point(pos):
+		AudioManager.play_button_click()
 		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 
@@ -210,21 +339,30 @@ func _load_stats_cache() -> void:
 	for p in ProfileManager.profiles:
 		var cfg  := ConfigFile.new()
 		var path := ProfileManager.profile_dir(p["id"]) + "stats.cfg"
-		var data: Dictionary = {"wins": 0, "losses": 0, "points": 0}
+		var data: Dictionary = {"wins": 0, "losses": 0, "tokens": 0, "level": 0, "xp_in": 0}
 		if cfg.load(path) == OK:
 			data["wins"]   = cfg.get_value("stats", "wins",   0)
 			data["losses"] = cfg.get_value("stats", "losses", 0)
-			data["points"] = cfg.get_value("stats", "points", 0)
+			data["tokens"] = cfg.get_value("stats", "tokens", 0)
+			var xp: int    = cfg.get_value("stats", "xp",     0)
+			data["level"]  = mini(xp / 100, 999)
+			data["xp_in"]  = xp % 100 if data["level"] < 999 else 99
 		_stats_cache[p["id"]] = data
 
 
-# ── Drawing ──────────────────────────────────────────────────────────────────
+# ── Drawing ───────────────────────────────────────────────────────────────────
 
 func _draw() -> void:
+	_scroll_offset = clampf(_scroll_offset, 0.0, _max_scroll())
 	_draw_background()
-	_draw_header()
 	_draw_profile_cards()
-	_draw_bottom_buttons()
+	# Fixed overlays drawn after cards so they cover anything that scrolled under them
+	_draw_header()
+	_draw_footer()
+	_draw_scrollbar()
+	if _drag_active and _drag_profile_idx >= 0:
+		_draw_drag_ghost()
+	CornerHUD.draw_on(self)
 
 
 func _draw_background() -> void:
@@ -249,6 +387,8 @@ func _draw_background() -> void:
 
 
 func _draw_header() -> void:
+	# Opaque background covers any cards that have scrolled into the header area
+	draw_rect(Rect2(0.0, 0.0, ARENA_WIDTH, HEADER_H), Color(0.07, 0.07, 0.12, 1.0))
 	var font := ThemeDB.fallback_font
 	var cx: float = ARENA_WIDTH / 2.0
 	var title := "PLAYER PROFILES"
@@ -262,28 +402,102 @@ func _draw_header() -> void:
 		Color(0.3, 0.3, 0.4, 0.6), 1.0)
 
 
+func _draw_footer() -> void:
+	var font := ThemeDB.fallback_font
+	var cx: float    = ARENA_WIDTH / 2.0
+	var footer_y: float = ARENA_HEIGHT - FOOTER_H
+
+	# Separator + opaque background
+	draw_line(Vector2(0, footer_y), Vector2(ARENA_WIDTH, footer_y), Color(0.3, 0.3, 0.4, 0.8), 1.0)
+	draw_rect(Rect2(0, footer_y, ARENA_WIDTH, FOOTER_H), Color(0.07, 0.07, 0.12, 1.0))
+
+	var btn_top: float = footer_y + 8.0
+
+	# NEW PROFILE
+	var np_w: float = 220.0; var np_h: float = 48.0
+	_new_profile_rect = Rect2(cx - np_w / 2.0, btn_top, np_w, np_h)
+	var np_hov: bool = hover_section == "new_profile"
+	draw_rect(_new_profile_rect,
+		Color(0.18, 0.28, 0.48, 1.0) if np_hov else Color(0.12, 0.18, 0.3, 1.0))
+	draw_rect(_new_profile_rect, Color(0.35, 0.55, 0.9, 0.85), false, 2.0)
+	var np_lbl := "+ NEW PROFILE"; var np_sz: int = 20
+	var np_lw := font.get_string_size(np_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, np_sz).x
+	draw_string(font, Vector2(cx - np_lw / 2.0, btn_top + 32.0), np_lbl,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, np_sz,
+		Color.WHITE if np_hov else Color(0.75, 0.85, 1.0, 1.0))
+
+	# BACK
+	var bw: float = 120.0; var bh: float = 36.0
+	_back_rect = Rect2(COL_LEFT, btn_top + 6.0, bw, bh)
+	var back_hov: bool = hover_section == "back"
+	draw_rect(_back_rect,
+		Color(0.35, 0.35, 0.45, 1.0) if back_hov else Color(0.2, 0.2, 0.28, 1.0))
+	draw_rect(_back_rect, Color(0.45, 0.45, 0.55, 0.7), false, 1.5)
+	var bl := "← Back"; var blsz := 18
+	var blw := font.get_string_size(bl, HORIZONTAL_ALIGNMENT_LEFT, -1, blsz).x
+	draw_string(font, Vector2(COL_LEFT + (bw - blw) / 2.0, _back_rect.position.y + 25.0), bl,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, blsz, Color(0.7, 0.7, 0.8, 1.0))
+
+
+func _draw_scrollbar() -> void:
+	var scroll_area_h: float = ARENA_HEIGHT - HEADER_H - FOOTER_H
+	var content_h: float     = float(ProfileManager.profiles.size()) * (CARD_H + CARD_GAP)
+	if content_h <= scroll_area_h:
+		return
+	var track_h: float = scroll_area_h - 8.0
+	var thumb_h: float = maxf(24.0, track_h * (scroll_area_h / content_h))
+	var thumb_t: float = _scroll_offset / maxf(1.0, content_h - scroll_area_h)
+	var thumb_y: float = HEADER_H + 4.0 + thumb_t * (track_h - thumb_h)
+	draw_rect(Rect2(ARENA_WIDTH - 8.0, HEADER_H + 4.0, 4.0, track_h), Color(0.2, 0.2, 0.3, 0.6))
+	draw_rect(Rect2(ARENA_WIDTH - 8.0, thumb_y, 4.0, thumb_h), Color(0.55, 0.55, 0.7, 0.9))
+
+
 func _draw_profile_cards() -> void:
 	var font := ThemeDB.fallback_font
 	_select_rects.clear()
 	_delete_rects.clear()
 	_rename_rects.clear()
 
-	var start_y: float    = 110.0
 	var non_active_i: int = 0
 
 	for i in ProfileManager.profiles.size():
-		var p: Dictionary   = ProfileManager.profiles[i]
-		var is_active: bool = p["id"] == ProfileManager.active_id
+		var p: Dictionary    = ProfileManager.profiles[i]
+		var is_active: bool  = p["id"] == ProfileManager.active_id
 		var is_confirm: bool = p["id"] == _confirm_delete_id
 		var is_renaming: bool = p["id"] == _rename_id
 
-		var card_y: float  = start_y + i * (CARD_H + CARD_GAP)
+		# Screen-space Y for this card (accounts for scroll)
+		var card_y: float  = HEADER_H + float(i) * (CARD_H + CARD_GAP) - _scroll_offset
 		var card_w: float  = COL_RIGHT - COL_LEFT
 		var card_rect := Rect2(COL_LEFT, card_y, card_w, CARD_H)
+
+		# Skip drawing if fully outside scroll area, but maintain rect arrays
+		var in_view: bool = card_y + CARD_H > HEADER_H and card_y < ARENA_HEIGHT - FOOTER_H
+
+		if not in_view:
+			_rename_rects.append(Rect2())
+			if not is_active:
+				_select_rects.append(Rect2())
+				_delete_rects.append(Rect2())
+				non_active_i += 1
+			continue
 
 		# Card background
 		var card_bg: Color
 		var card_brd: Color
+		if _drag_active and i == _drag_profile_idx:
+			# Ghost placeholder — dimmed slot while card is being dragged
+			card_bg  = Color(0.06, 0.06, 0.09, 0.4)
+			card_brd = Color(0.2, 0.2, 0.3, 0.3)
+			draw_rect(card_rect, card_bg)
+			draw_rect(card_rect, card_brd, false, 1.0)
+			_rename_rects.append(Rect2())
+			if not is_active:
+				_select_rects.append(Rect2())
+				_delete_rects.append(Rect2())
+				non_active_i += 1
+			continue
+
 		if is_renaming:
 			card_bg  = Color(0.1, 0.15, 0.22, 1.0)
 			card_brd = Color(0.35, 0.55, 0.9, 0.9)
@@ -299,15 +513,21 @@ func _draw_profile_cards() -> void:
 		draw_rect(card_rect, card_bg)
 		draw_rect(card_rect, card_brd, false, 2.0)
 
+		# Drag handle — three small lines on the left edge
+		if not is_renaming and not is_confirm:
+			for di in range(3):
+				var dy: float = card_y + CARD_H / 2.0 - 4.0 + float(di) * 4.0
+				draw_line(Vector2(COL_LEFT + 6.0, dy), Vector2(COL_LEFT + 14.0, dy),
+					Color(0.35, 0.35, 0.5, 0.45), 1.5)
+
 		if is_renaming:
 			# ── Inline rename form ─────────────────────────────────────────────
-			draw_string(font, Vector2(COL_LEFT + 16.0, card_y + 22.0), "RENAME",
+			draw_string(font, Vector2(COL_LEFT + 20.0, card_y + 22.0), "RENAME",
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.45, 0.65, 0.9, 0.9))
 
-			# Text input box
-			var box_x: float = COL_LEFT + 16.0
+			var box_x: float = COL_LEFT + 20.0
 			var box_w: float = card_w - 230.0
-			var box_y: float = card_y + 28.0
+			var box_y: float = card_y + 34.0
 			var box_h: float = 34.0
 			draw_rect(Rect2(box_x, box_y, box_w, box_h), Color(0.08, 0.12, 0.2, 1.0))
 			draw_rect(Rect2(box_x, box_y, box_w, box_h), Color(0.35, 0.55, 0.9, 0.85), false, 1.5)
@@ -316,10 +536,9 @@ func _draw_profile_cards() -> void:
 			draw_string(font, Vector2(box_x + 10.0, box_y + 24.0), display,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.9, 0.9, 1.0, 1.0))
 
-			# SAVE button
 			var sv_w: float = 80.0; var sv_h: float = 34.0
 			var sv_x: float = COL_RIGHT - 185.0
-			var sv_y: float = card_y + 25.0
+			var sv_y: float = card_y + 31.0
 			_rename_save_rect = Rect2(sv_x, sv_y, sv_w, sv_h)
 			var sv_valid: bool = _rename_text.strip_edges().length() > 0
 			var sv_hov: bool   = hover_section == "rename_save"
@@ -336,7 +555,6 @@ func _draw_profile_cards() -> void:
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 14,
 				Color.WHITE if sv_valid else Color(0.35, 0.35, 0.42, 1.0))
 
-			# CANCEL button
 			var cn_w: float = 80.0
 			var cn_x: float = COL_RIGHT - 95.0
 			_rename_cancel_rect = Rect2(cn_x, sv_y, cn_w, sv_h)
@@ -349,7 +567,6 @@ func _draw_profile_cards() -> void:
 			draw_string(font, Vector2(cn_x + (cn_w - cnw) / 2.0, sv_y + 23.0), cnlbl,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.7, 0.7, 0.8, 1.0))
 
-			# Placeholder rename rect (non-interactive while open)
 			_rename_rects.append(Rect2())
 
 		elif is_confirm:
@@ -362,7 +579,6 @@ func _draw_profile_cards() -> void:
 
 			var btn_h: float = 30.0; var btn_y: float = card_y + (CARD_H - btn_h) / 2.0
 
-			# DELETE YES
 			var yes_w: float = 80.0; var yes_x: float = COL_RIGHT - 185.0
 			_confirm_yes_rect = Rect2(yes_x, btn_y, yes_w, btn_h)
 			var yes_hov: bool = hover_section == "confirm_yes"
@@ -373,7 +589,6 @@ func _draw_profile_cards() -> void:
 			draw_string(font, Vector2(yes_x + (yes_w - yw) / 2.0, btn_y + 21.0),
 				"DELETE", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
 
-			# CANCEL
 			var no_w: float = 80.0; var no_x: float = COL_RIGHT - 95.0
 			_confirm_no_rect = Rect2(no_x, btn_y, no_w, btn_h)
 			var no_hov: bool = hover_section == "confirm_no"
@@ -384,36 +599,47 @@ func _draw_profile_cards() -> void:
 			draw_string(font, Vector2(no_x + (no_w - nw) / 2.0, btn_y + 21.0),
 				"CANCEL", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.7, 0.7, 0.8, 1.0))
 
-			_rename_rects.append(Rect2())  # Placeholder — not interactive during confirm
+			_rename_rects.append(Rect2())
 
 		else:
 			# ── Normal card ────────────────────────────────────────────────────
 			var nsz: int = 24
-			draw_string(font, Vector2(COL_LEFT + 20.0, card_y + 34.0), p["name"],
+			draw_string(font, Vector2(COL_LEFT + 22.0, card_y + 32.0), p["name"],
 				HORIZONTAL_ALIGNMENT_LEFT, -1, nsz,
 				Color.WHITE if is_active else Color(0.75, 0.75, 0.85, 1.0))
 
-			var stats: Dictionary = _stats_cache.get(p["id"], {"wins": 0, "losses": 0, "points": 0})
-			var stat_text := "%d wins  ·  %d losses  ·  %d pts" % [
-				stats["wins"], stats["losses"], stats["points"]]
-			draw_string(font, Vector2(COL_LEFT + 20.0, card_y + 58.0), stat_text,
+			var stats: Dictionary = _stats_cache.get(p["id"],
+				{"wins": 0, "losses": 0, "tokens": 0, "level": 0, "xp_in": 0})
+			var stat_text := "Lv %d  ·  %d wins  ·  %d losses  ·  %d tokens" % [
+				stats["level"], stats["wins"], stats["losses"], stats["tokens"]]
+			draw_string(font, Vector2(COL_LEFT + 22.0, card_y + 54.0), stat_text,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 14,
 				Color(0.5, 0.75, 0.55, 1.0) if is_active else Color(0.45, 0.45, 0.55, 1.0))
+
+			# XP bar
+			var bar_x: float = COL_LEFT + 12.0
+			var bar_w: float = card_w - 24.0
+			var bar_y: float = card_y + CARD_H - 16.0
+			var bar_h: float = 5.0
+			var xp_fill: float = float(stats["xp_in"]) / 100.0 if stats["level"] < 999 else 1.0
+			draw_rect(Rect2(bar_x, bar_y, bar_w, bar_h), Color(0.12, 0.12, 0.22, 1.0))
+			draw_rect(Rect2(bar_x, bar_y, bar_w, bar_h), Color(0.3, 0.3, 0.5, 0.5), false, 1.0)
+			if xp_fill > 0.0:
+				var fill_col := Color(0.3, 0.85, 0.45, 1.0) if is_active else Color(0.25, 0.6, 0.85, 1.0)
+				draw_rect(Rect2(bar_x, bar_y, bar_w * xp_fill, bar_h), fill_col)
 
 			var btn_h: float = 30.0
 			var btn_y: float = card_y + (CARD_H - btn_h) / 2.0
 
 			if is_active:
-				# ACTIVE label + RENAME
 				var badge := "ACTIVE"
 				var bsz: int = 13
 				var bw2 := font.get_string_size(badge, HORIZONTAL_ALIGNMENT_LEFT, -1, bsz).x
 				draw_string(font, Vector2(COL_RIGHT - 20.0 - bw2, card_y + 24.0), badge,
 					HORIZONTAL_ALIGNMENT_LEFT, -1, bsz, Color(0.3, 0.9, 0.45, 1.0))
 
-				# RENAME button (below ACTIVE label)
 				var rn_w: float = 80.0; var rn_x: float = COL_RIGHT - 100.0
-				var rn_y: float = card_y + 40.0
+				var rn_y: float = card_y + 42.0
 				var rn_rect := Rect2(rn_x, rn_y, rn_w, 26.0)
 				var rn_hov: bool = hover_section == "rename" and hover_index == i
 				draw_rect(rn_rect,
@@ -427,7 +653,6 @@ func _draw_profile_cards() -> void:
 				_rename_rects.append(rn_rect)
 
 			else:
-				# Non-active: SELECT · DELETE · RENAME (right to left)
 				# RENAME
 				var rn_w: float = 80.0; var rn_x: float = COL_RIGHT - 90.0
 				var rn_rect := Rect2(rn_x, btn_y, rn_w, btn_h)
@@ -475,32 +700,32 @@ func _draw_profile_cards() -> void:
 				non_active_i += 1
 
 
-func _draw_bottom_buttons() -> void:
+func _draw_drag_ghost() -> void:
 	var font := ThemeDB.fallback_font
-	var cx: float         = ARENA_WIDTH / 2.0
-	var cards_bottom: float = 110.0 + ProfileManager.profiles.size() * (CARD_H + CARD_GAP) + 20.0
+	var n: int = ProfileManager.profiles.size()
+	if _drag_profile_idx < 0 or _drag_profile_idx >= n:
+		return
 
-	# NEW PROFILE
-	var np_w: float = 220.0; var np_h: float = 48.0
-	_new_profile_rect = Rect2(cx - np_w / 2.0, cards_bottom, np_w, np_h)
-	var np_hov: bool = hover_section == "new_profile"
-	draw_rect(_new_profile_rect,
-		Color(0.18, 0.28, 0.48, 1.0) if np_hov else Color(0.12, 0.18, 0.3, 1.0))
-	draw_rect(_new_profile_rect, Color(0.35, 0.55, 0.9, 0.85), false, 2.0)
-	var np_lbl := "+ NEW PROFILE"; var np_sz: int = 20
-	var np_lw := font.get_string_size(np_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, np_sz).x
-	draw_string(font, Vector2(cx - np_lw / 2.0, cards_bottom + 32.0), np_lbl,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, np_sz,
-		Color.WHITE if np_hov else Color(0.75, 0.85, 1.0, 1.0))
+	# Insertion indicator line
+	var line_y: float = HEADER_H + float(_drag_insert_idx) * (CARD_H + CARD_GAP) \
+		- CARD_GAP / 2.0 - _scroll_offset
+	line_y = clampf(line_y, HEADER_H + 2.0, ARENA_HEIGHT - FOOTER_H - 2.0)
+	draw_line(Vector2(COL_LEFT, line_y), Vector2(COL_RIGHT, line_y),
+		Color(0.35, 0.7, 1.0, 0.9), 2.5)
+	# Small arrow nubs at the ends
+	draw_line(Vector2(COL_LEFT, line_y - 4), Vector2(COL_LEFT, line_y + 4),
+		Color(0.35, 0.7, 1.0, 0.9), 2.0)
+	draw_line(Vector2(COL_RIGHT, line_y - 4), Vector2(COL_RIGHT, line_y + 4),
+		Color(0.35, 0.7, 1.0, 0.9), 2.0)
 
-	# BACK
-	var bw: float = 120.0; var bh: float = 36.0
-	_back_rect = Rect2(COL_LEFT, cards_bottom + 6.0, bw, bh)
-	var back_hov: bool = hover_section == "back"
-	draw_rect(_back_rect,
-		Color(0.35, 0.35, 0.45, 1.0) if back_hov else Color(0.2, 0.2, 0.28, 1.0))
-	draw_rect(_back_rect, Color(0.45, 0.45, 0.55, 0.7), false, 1.5)
-	var bl := "← Back"; var blsz := 18
-	var blw := font.get_string_size(bl, HORIZONTAL_ALIGNMENT_LEFT, -1, blsz).x
-	draw_string(font, Vector2(COL_LEFT + (bw - blw) / 2.0, _back_rect.position.y + 25.0), bl,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, blsz, Color(0.7, 0.7, 0.8, 1.0))
+	# Ghost card following cursor
+	var p: Dictionary = ProfileManager.profiles[_drag_profile_idx]
+	var card_w: float  = COL_RIGHT - COL_LEFT
+	var ghost_y: float = _drag_current_pos.y - CARD_H / 2.0
+	var ghost_rect := Rect2(COL_LEFT, ghost_y, card_w, CARD_H)
+	draw_rect(ghost_rect, Color(0.14, 0.22, 0.38, 0.92))
+	draw_rect(ghost_rect, Color(0.35, 0.7, 1.0, 0.9), false, 2.0)
+	draw_string(font, Vector2(COL_LEFT + 22.0, ghost_y + 36.0), p["name"],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color(0.85, 0.92, 1.0, 0.95))
+	draw_string(font, Vector2(COL_LEFT + 22.0, ghost_y + 58.0), "drag to reorder",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.45, 0.6, 0.85, 0.65))

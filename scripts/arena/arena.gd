@@ -53,6 +53,18 @@ var _side_for_colour: Dictionary = {}       # colour_type -> polygon side index
 var _zone_angles:     Dictionary = {}       # colour_type -> outward normal angle (radians)
 var _map_vertices:    PackedVector2Array    # polygon vertices for current map
 
+const BLACK_HOLE_PULL_RANGE: float = 160.0
+const BLACK_HOLE_RADIUS:     float = 22.0   # Visual radius
+const BLACK_HOLE_CORE_RADIUS: float = 11.0  # Deletion core (half of visual)
+const BLACK_HOLE_FORCE:      float = 700.0
+const BLACK_HOLE_ACTIVE_MIN: float = 6.0    # Seconds the hole stays visible
+const BLACK_HOLE_ACTIVE_MAX: float = 10.0
+const BLACK_HOLE_COOLDOWN_MIN: float = 4.0  # Seconds between appearances
+const BLACK_HOLE_COOLDOWN_MAX: float = 9.0
+const PILLAR_RADIUS:         float = 20.0
+const PILLAR_COUNT:          int   = 6
+const PILLAR_RING_RADIUS:    float = 220.0   # Distance of pillars from centre
+
 var spawn_timer:       float = 0.0
 var spawn_colour_index: int  = 0
 var session_time:      float = 0.0
@@ -61,6 +73,12 @@ var game_over_screen:  Control = null
 var pause_menu:        Node2D  = null
 var settings_overlay:  Node2D  = null
 var is_game_over:      bool    = false
+var _overtime:         bool    = false   # Extra Time: timer expired, waiting for balls to clear
+var _pillars:          Array   = []      # Pillar StaticBody2D nodes
+var _bh_active:        bool    = false   # Is the roaming black hole currently visible?
+var _bh_position:      Vector2 = Vector2.ZERO
+var _bh_timer:         float   = 0.0    # Counts down: active duration or cooldown
+var _bh_fade:          float   = 0.0    # 0→1 appear, 1→0 vanish (over 0.4s each)
 
 
 func _ready() -> void:
@@ -74,17 +92,38 @@ func _ready() -> void:
 	_setup_timer_display()
 	_setup_game_over_screen()
 	_setup_pause_menu()
+	_setup_pillars()
 	_start_round()
 
 
 func _process(delta: float) -> void:
 	if is_game_over:
 		return
+
 	session_time += delta
+
+	# Extra Time: timer expired — end once the arena is empty
+	if _overtime:
+		if get_tree().get_nodes_in_group("balls").size() == 0:
+			_end_round()
+		if GameConfig.has_modifier("black_hole"):
+			_tick_black_hole(delta)
+			queue_redraw()
+		return
+
+	# Chaos Ball: halve the spawn interval
+	var effective_interval: float = ball_spawn_interval / 2.0 \
+		if GameConfig.has_modifier("chaos_ball") else ball_spawn_interval
+
 	spawn_timer += delta
-	if spawn_timer >= ball_spawn_interval:
+	if spawn_timer >= effective_interval:
 		spawn_timer = 0.0
 		_try_spawn_ball()
+
+	# Black Hole: roaming — appears at a random point for a few seconds then vanishes
+	if GameConfig.has_modifier("black_hole"):
+		_tick_black_hole(delta)
+		queue_redraw()
 
 
 # ── Active colours ─────────────────────────────────────────────────────────────
@@ -208,8 +247,11 @@ func _end_round() -> void:
 	if game_over_screen:
 		game_over_screen.show_results(
 			scores, player_colour, collapsed_colours,
-			result.get("points_earned", 0),
-			result.get("is_new_high_score", false)
+			result.get("tokens_earned", 0),
+			result.get("is_new_high_score", false),
+			result.get("xp_earned", 0),
+			result.get("level_before", 0),
+			result.get("level_after", 0)
 		)
 
 
@@ -463,7 +505,12 @@ func _on_pause_exit() -> void:
 # ── Signals ────────────────────────────────────────────────────────────────────
 
 func _on_timer_expired() -> void:
-	_end_round()
+	if GameConfig.has_modifier("extra_time"):
+		_overtime = true
+		if timer_display:
+			timer_display.enter_overtime()
+	else:
+		_end_round()
 
 
 func _on_score_up(ct: int, points: int) -> void:
@@ -497,8 +544,12 @@ func _spawn_ball() -> void:
 	var ball := ball_scene.instantiate()
 	ball.position = Vector2(ARENA_WIDTH / 2.0, ARENA_HEIGHT / 2.0)
 
-	var ct: int = active_colours[spawn_colour_index % active_colours.size()]
-	spawn_colour_index += 1
+	var ct: int
+	if GameConfig.has_modifier("load_balanced"):
+		ct = _get_lowest_score_colour()
+	else:
+		ct = active_colours[spawn_colour_index % active_colours.size()]
+		spawn_colour_index += 1
 	ball.set_colour(ct)
 	ball.set_random_size()
 	add_child(ball)
@@ -526,13 +577,13 @@ func _get_zone_direction_angle(ct: int) -> float:
 	return _zone_angles.get(target_ct, randf_range(0.0, TAU))
 
 
-func _on_ball_split(original: RigidBody2D, count: int) -> void:
+func _on_ball_split(original: RigidBody2D, count: int, spread_angle: float) -> void:
 	if not is_instance_valid(original):
 		return
-	call_deferred("_do_ball_split", original, count)
+	call_deferred("_do_ball_split", original, count, spread_angle)
 
 
-func _do_ball_split(original: RigidBody2D, count: int) -> void:
+func _do_ball_split(original: RigidBody2D, count: int, spread_angle: float) -> void:
 	if not is_instance_valid(original):
 		return
 
@@ -552,9 +603,107 @@ func _do_ball_split(original: RigidBody2D, count: int) -> void:
 		add_child(t)
 		t._apply_size()
 
-		var angle: float = vel.angle() + randf_range(-PI / 5.0, PI / 5.0)
+		var angle: float = vel.angle() + randf_range(-spread_angle, spread_angle)
 		t.linear_velocity = Vector2.from_angle(angle) * vel.length() * 1.1
 		t.request_split.connect(_on_ball_split)
+
+
+# ── Modifier helpers ───────────────────────────────────────────────────────────
+
+func _get_lowest_score_colour() -> int:
+	## Returns the active colour with the lowest score (random among ties).
+	var min_score: int = 2147483647
+	for ct in active_colours:
+		if ct not in collapsed_colours:
+			min_score = mini(min_score, scores.get(ct, 0))
+	var candidates: Array = []
+	for ct in active_colours:
+		if ct not in collapsed_colours and scores.get(ct, 0) == min_score:
+			candidates.append(ct)
+	if candidates.is_empty():
+		return active_colours[0]
+	return candidates[randi() % candidates.size()]
+
+
+func _tick_black_hole(delta: float) -> void:
+	## Manage the roaming black hole lifecycle and apply physics when active.
+	const FADE_TIME: float = 0.4
+
+	if _bh_active:
+		_bh_timer -= delta
+		_bh_fade   = minf(_bh_fade + delta / FADE_TIME, 1.0)
+
+		# Pull and destroy balls while visible
+		var range_sq: float = BLACK_HOLE_PULL_RANGE * BLACK_HOLE_PULL_RANGE
+		var core_sq: float  = BLACK_HOLE_CORE_RADIUS * BLACK_HOLE_CORE_RADIUS
+		for ball in get_tree().get_nodes_in_group("balls"):
+			var offset: Vector2 = _bh_position - ball.global_position
+			var dist_sq: float  = offset.length_squared()
+			if dist_sq <= core_sq:
+				ball.queue_free()
+			elif dist_sq <= range_sq:
+				var dist: float   = sqrt(dist_sq)
+				var scale: float  = 1.0 - (dist / BLACK_HOLE_PULL_RANGE)
+				ball.apply_central_force(offset.normalized() * BLACK_HOLE_FORCE * scale * _bh_fade)
+
+		if _bh_timer <= 0.0:
+			# Begin fade-out then switch to cooldown
+			_bh_active = false
+			_bh_timer  = randf_range(BLACK_HOLE_COOLDOWN_MIN, BLACK_HOLE_COOLDOWN_MAX)
+	else:
+		# Cooldown — fade out visually
+		_bh_fade  = maxf(_bh_fade - delta / FADE_TIME, 0.0)
+		_bh_timer -= delta
+		if _bh_timer <= 0.0:
+			_bh_active   = true
+			_bh_timer    = randf_range(BLACK_HOLE_ACTIVE_MIN, BLACK_HOLE_ACTIVE_MAX)
+			_bh_position = _random_interior_point()
+
+func _random_interior_point() -> Vector2:
+	## Returns a random point well inside the polygon (using bounding box rejection).
+	var margin: float = 120.0
+	var min_x: float = 0.0; var max_x: float = 0.0
+	var min_y: float = 0.0; var max_y: float = 0.0
+	for v in _map_vertices:
+		min_x = minf(min_x, v.x); max_x = maxf(max_x, v.x)
+		min_y = minf(min_y, v.y); max_y = maxf(max_y, v.y)
+	min_x += margin; max_x -= margin; min_y += margin; max_y -= margin
+	for _attempt in 30:
+		var p := Vector2(randf_range(min_x, max_x), randf_range(min_y, max_y))
+		if Geometry2D.is_point_in_polygon(p, _map_vertices):
+			return p
+	# Fallback: centre
+	return Vector2(ARENA_WIDTH, ARENA_HEIGHT) / 2.0
+
+
+func _setup_pillars() -> void:
+	## Spawn evenly-spaced bouncy pillars around the arena centre.
+	if not GameConfig.has_modifier("pillars"):
+		return
+	var centre: Vector2 = Vector2(ARENA_WIDTH, ARENA_HEIGHT) / 2.0
+	for i in PILLAR_COUNT:
+		var angle: float = i * TAU / PILLAR_COUNT
+		var pos: Vector2 = centre + Vector2.from_angle(angle) * PILLAR_RING_RADIUS
+		_create_pillar(pos)
+
+
+func _create_pillar(pos: Vector2) -> void:
+	var pillar := StaticBody2D.new()
+	pillar.position = pos
+
+	var physics_mat := PhysicsMaterial.new()
+	physics_mat.bounce   = 1.0
+	physics_mat.friction = 0.0
+	pillar.physics_material_override = physics_mat
+
+	var col_shape := CollisionShape2D.new()
+	var circle    := CircleShape2D.new()
+	circle.radius = PILLAR_RADIUS
+	col_shape.shape = circle
+	pillar.add_child(col_shape)
+
+	add_child(pillar)
+	_pillars.append(pillar)
 
 
 # ── Drawing ────────────────────────────────────────────────────────────────────
@@ -562,6 +711,10 @@ func _do_ball_split(original: RigidBody2D, count: int) -> void:
 func _draw() -> void:
 	_draw_arena_background()
 	_draw_polygon_outline()
+	if GameConfig.has_modifier("pillars"):
+		_draw_pillars()
+	if GameConfig.has_modifier("black_hole"):
+		_draw_black_hole()
 
 
 func _draw_arena_background() -> void:
@@ -592,3 +745,37 @@ func _draw_polygon_outline() -> void:
 		else:
 			# Solid wall sides
 			draw_line(a, b, Color(0.7, 0.7, 0.8, 0.9), 3.0)
+
+
+func _draw_pillars() -> void:
+	for pillar in _pillars:
+		var pos: Vector2 = pillar.position
+		draw_circle(pos, PILLAR_RADIUS, Color(0.22, 0.22, 0.32, 1.0))
+		draw_arc(pos, PILLAR_RADIUS, 0, TAU, 24, Color(0.55, 0.55, 0.72, 1.0), 2.5)
+		# Inner highlight
+		draw_arc(pos, PILLAR_RADIUS * 0.55, 0, TAU, 16, Color(0.65, 0.65, 0.82, 0.4), 1.5)
+
+
+func _draw_black_hole() -> void:
+	if _bh_fade <= 0.0:
+		return
+	var pos: Vector2 = _bh_position
+	var f: float     = _bh_fade          # 0–1 fade multiplier
+	var t: float     = Time.get_ticks_msec() / 1000.0
+
+	# Faint pull-range glow rings
+	for i in 3:
+		var ring_r: float     = BLACK_HOLE_PULL_RANGE * (0.35 + i * 0.22)
+		var ring_alpha: float = (0.07 - i * 0.018) * f
+		draw_circle(pos, ring_r, Color(0.45, 0.1, 0.8, ring_alpha))
+
+	# Spinning accretion arc wisps
+	for i in 4:
+		var a0: float = i * TAU / 4.0 + t * 1.8
+		draw_arc(pos, BLACK_HOLE_PULL_RANGE * 0.52, a0, a0 + 0.5, 10, Color(0.55, 0.2, 0.9, 0.45 * f), 2.0)
+		draw_arc(pos, BLACK_HOLE_PULL_RANGE * 0.32, a0 + 0.35, a0 + 0.85, 8, Color(0.6, 0.25, 0.95, 0.3 * f), 1.5)
+
+	# Core
+	draw_circle(pos, BLACK_HOLE_RADIUS * f, Color(0.03, 0.0, 0.08, 1.0))
+	draw_arc(pos, BLACK_HOLE_RADIUS * f, 0, TAU, 32, Color(0.65, 0.25, 1.0, 0.95 * f), 3.0)
+	draw_circle(pos, BLACK_HOLE_RADIUS * 0.45 * f, Color(0.0, 0.0, 0.0, 1.0))

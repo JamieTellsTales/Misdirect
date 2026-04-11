@@ -61,6 +61,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_handle_key(event)
 
 
+var _prev_hover_section: String = ""
+
 func _update_hover(pos: Vector2) -> void:
 	hover_section = ""
 	if _create_rect.has_point(pos) and _name_is_valid():
@@ -69,14 +71,20 @@ func _update_hover(pos: Vector2) -> void:
 		hover_section = "settings"
 	elif show_back and _back_rect.has_point(pos):
 		hover_section = "back"
+	if hover_section != _prev_hover_section and hover_section != "":
+		AudioManager.play_button_hover()
+	_prev_hover_section = hover_section
 
 
 func _handle_click(pos: Vector2) -> void:
 	if _create_rect.has_point(pos) and _name_is_valid():
+		AudioManager.play_button_click()
 		_create_profile()
 	elif _settings_rect.has_point(pos):
+		AudioManager.play_button_click()
 		_open_settings()
 	elif show_back and _back_rect.has_point(pos):
+		AudioManager.play_button_click()
 		get_tree().change_scene_to_file("res://scenes/profile_select.tscn")
 
 
@@ -120,8 +128,22 @@ func _name_is_valid() -> bool:
 
 
 func _create_profile() -> void:
-	ProfileManager.create_profile(name_text.strip_edges())
+	var trimmed: String = name_text.strip_edges()
+	ProfileManager.create_profile(trimmed)
 	StatsManager.load_stats()   # Reload for the new profile
+	# Easter egg: exact name match grants a head-start
+	if trimmed == "DirtyCheater":
+		StatsManager.xp     = 100 * 100   # 100 levels (100 XP per level)
+		StatsManager.tokens = 2000
+		# Unlock every map by satisfying each map's win requirement on its prerequisite
+		StatsManager.map_wins = {
+			"triangle": 4,   # unlocks square  (needs 4)
+			"square":   5,   # unlocks pentagon (needs 5)
+			"pentagon": 6,   # unlocks hexagon  (needs 6)
+			"hexagon":  7,   # unlocks heptagon (needs 7)
+			"heptagon": 8,   # unlocks octagon  (needs 8)
+		}
+		StatsManager.save_stats()
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 

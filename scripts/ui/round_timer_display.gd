@@ -9,6 +9,7 @@ signal timer_expired
 var time_remaining: float = 0.0
 var is_running: bool = false
 var is_warning: bool = false
+var is_overtime: bool = false
 
 
 func _ready() -> void:
@@ -35,19 +36,26 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	var font := ThemeDB.fallback_font
-	var minutes: int = int(time_remaining) / 60
-	var seconds: int = int(time_remaining) % 60
-	var time_text: String = "%d:%02d" % [minutes, seconds]
-
 	var font_size: int = 28
+
+	var time_text: String
+	var text_color: Color
+	if is_overtime:
+		time_text = "OVERTIME"
+		var pulse: float = (sin(Time.get_ticks_msec() / 300.0) + 1.0) / 2.0
+		text_color = Color.WHITE.lerp(Color(1.0, 0.6, 0.1, 1.0), pulse)
+	else:
+		var minutes: int = int(time_remaining) / 60
+		var seconds: int = int(time_remaining) % 60
+		time_text = "%d:%02d" % [minutes, seconds]
+		text_color = Color.WHITE
+		if is_warning:
+			var pulse: float = (sin(Time.get_ticks_msec() / 150.0) + 1.0) / 2.0
+			text_color = Color.WHITE.lerp(Color.YELLOW, pulse)
+
 	var text_size := font.get_string_size(time_text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
 	var x: float = (size.x - text_size.x) / 2.0
 	var y: float = (size.y + text_size.y) / 2.0 - 4
-
-	var text_color := Color.WHITE
-	if is_warning:
-		var pulse: float = (sin(Time.get_ticks_msec() / 150.0) + 1.0) / 2.0
-		text_color = Color.WHITE.lerp(Color.YELLOW, pulse)
 
 	# Shadow
 	draw_string(font, Vector2(x + 1, y + 1), time_text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(0, 0, 0, 0.8))
@@ -62,6 +70,12 @@ func start_timer() -> void:
 
 func stop_timer() -> void:
 	is_running = false
+
+
+func enter_overtime() -> void:
+	is_running  = false
+	is_overtime = true
+	queue_redraw()
 
 
 func get_time_remaining() -> float:
