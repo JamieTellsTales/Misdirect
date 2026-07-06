@@ -68,10 +68,12 @@ func _ready() -> void:
 
 	sfx_player = AudioStreamPlayer.new()
 	sfx_player.bus = "SFX"
+	sfx_player.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(sfx_player)
 
 	_ui_player = AudioStreamPlayer.new()
 	_ui_player.bus = "SFX"
+	_ui_player.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(_ui_player)
 
 	# Rising ping — pleasant "correct" sound (500 → 1500 Hz, clean sine)

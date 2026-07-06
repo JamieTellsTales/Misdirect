@@ -7,16 +7,44 @@ const CONFIG_PATH := "user://settings.cfg"
 
 # ── Supported window resolutions (windowed mode) ────────────────────────────
 const RESOLUTIONS: Array = [
-	Vector2i(1280, 720),
-	Vector2i(1600, 900),
+	# ── Landscape ─────────────────────────────────────────────────────────────
+	Vector2i(1280,  720),
+	Vector2i(1280,  800),  # Steam Deck native
+	Vector2i(1334,  750),  # iPhone 6/7/8
+	Vector2i(1366,  768),  # Common laptop
+	Vector2i(1440,  900),
+	Vector2i(1600,  900),
 	Vector2i(1920, 1080),
+	Vector2i(1920, 1200),  # 16:10 widescreen
+	Vector2i(2340, 1080),  # iPhone 11 / 19.5:9 Android
+	Vector2i(2400, 1080),  # 20:9 Android (Pixel etc.)
+	Vector2i(2532, 1170),  # iPhone 12/13
+	Vector2i(2560, 1080),  # Ultrawide 1080p
 	Vector2i(2560, 1440),
+	Vector2i(2778, 1284),  # iPhone 14 Pro Max
+	Vector2i(3440, 1440),  # Ultrawide 1440p
+	Vector2i(3840, 2160),  # 4K
+	# ── Portrait ──────────────────────────────────────────────────────────────
+	Vector2i( 750, 1334),  # iPhone 6/7/8
+	Vector2i(1080, 1920),  # Android Full HD
+	Vector2i(1080, 2340),  # iPhone 11 / 19.5:9 Android
+	Vector2i(1080, 2400),  # 20:9 Android (Pixel etc.)
+	Vector2i(1170, 2532),  # iPhone 12/13
+	Vector2i(1284, 2778),  # iPhone 14 Pro Max
+]
+
+# ── Supported font modes ────────────────────────────────────────────────────
+const FONT_MODES: Array = [
+	{"id": "atkinson", "label": "Atkinson Hyperlegible"},
+	{"id": "dyslexic", "label": "OpenDyslexic"},
+	{"id": "default",  "label": "System Default"},
 ]
 
 # ── Current values (defaults shown) ─────────────────────────────────────────
 var fullscreen: bool = false
 var vsync: bool = true
 var resolution_index: int = 0   # Index into RESOLUTIONS
+var font_mode_index: int = 0    # Index into FONT_MODES
 var master_volume: float = 1.0  # 0.0 – 1.0
 var music_volume: float = 0.8
 var sfx_volume: float = 1.0
@@ -38,6 +66,8 @@ func load_settings() -> void:
 	vsync            = config.get_value("display", "vsync",             true)
 	resolution_index = config.get_value("display", "resolution_index",  0)
 	resolution_index = clampi(resolution_index, 0, RESOLUTIONS.size() - 1)
+	font_mode_index  = config.get_value("display", "font_mode_index",   0)
+	font_mode_index  = clampi(font_mode_index, 0, FONT_MODES.size() - 1)
 	master_volume    = config.get_value("audio",   "master_volume",     1.0)
 	music_volume     = config.get_value("audio",   "music_volume",      0.8)
 	sfx_volume       = config.get_value("audio",   "sfx_volume",        1.0)
@@ -48,6 +78,7 @@ func save_settings() -> void:
 	config.set_value("display", "fullscreen",       fullscreen)
 	config.set_value("display", "vsync",            vsync)
 	config.set_value("display", "resolution_index", resolution_index)
+	config.set_value("display", "font_mode_index",  font_mode_index)
 	config.set_value("audio",   "master_volume",    master_volume)
 	config.set_value("audio",   "music_volume",     music_volume)
 	config.set_value("audio",   "sfx_volume",       sfx_volume)
@@ -80,10 +111,12 @@ func _apply_display() -> void:
 			var screen: int       = DisplayServer.window_get_current_screen()
 			var screen_pos: Vector2i  = DisplayServer.screen_get_position(screen)
 			var screen_size: Vector2i = DisplayServer.screen_get_size(screen)
+			# Centre the window on screen, but clamp so it never goes above or
+			# left of the display — handles portrait windows taller than the monitor.
 			DisplayServer.window_set_position(
 				screen_pos + Vector2i(
-					(screen_size.x - res.x) / 2,
-					(screen_size.y - res.y) / 2
+					maxi(0, (screen_size.x - res.x) / 2),
+					maxi(0, (screen_size.y - res.y) / 2)
 				)
 			)
 
@@ -107,10 +140,31 @@ func _set_bus_volume(bus_name: String, linear: float) -> void:
 
 # ── Helpers used by the settings screen ─────────────────────────────────────
 
+func get_available_resolution_indices() -> Array:
+	## Returns indices into RESOLUTIONS that fit within the current display.
+	## Excludes any resolution larger than the monitor in either dimension.
+	var screen: int           = DisplayServer.window_get_current_screen()
+	var screen_size: Vector2i = DisplayServer.screen_get_size(screen)
+	var result: Array = []
+	for i in RESOLUTIONS.size():
+		var res: Vector2i = RESOLUTIONS[i]
+		if res.x <= screen_size.x and res.y <= screen_size.y:
+			result.append(i)
+	return result
+
+
 func get_resolution_label() -> String:
 	var res: Vector2i = RESOLUTIONS[resolution_index]
 	return "%d × %d" % [res.x, res.y]
 
 
 func step_resolution(direction: int) -> void:
-	resolution_index = wrapi(resolution_index + direction, 0, RESOLUTIONS.size())
+	## Cycles through only resolutions that fit the current display.
+	var avail: Array = get_available_resolution_indices()
+	if avail.is_empty():
+		return
+	var cur_pos: int = avail.find(resolution_index)
+	if cur_pos == -1:
+		resolution_index = avail[0]
+	else:
+		resolution_index = avail[wrapi(cur_pos + direction, 0, avail.size())]

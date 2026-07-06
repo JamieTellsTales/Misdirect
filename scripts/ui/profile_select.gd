@@ -4,10 +4,10 @@ extends Node2D
 
 const CornerHUD = preload("res://scripts/ui/corner_hud.gd")
 
-const ARENA_WIDTH:  float = 1280.0
-const ARENA_HEIGHT: float = 720.0
+var _sw: float = 1280.0
+var _sh: float = 720.0
 const COL_LEFT:     float = 180.0
-const COL_RIGHT:    float = ARENA_WIDTH - 180.0
+var _COL_RIGHT: float = 1280.0 - 180.0
 const CARD_H:       float = 96.0
 const CARD_GAP:     float = 16.0
 const MAX_NAME:     int   = 20
@@ -70,7 +70,7 @@ func _process(delta: float) -> void:
 
 
 func _max_scroll() -> float:
-	var scroll_area_h: float = ARENA_HEIGHT - HEADER_H - FOOTER_H
+	var scroll_area_h: float = _sh - HEADER_H - FOOTER_H
 	var content_h: float = float(ProfileManager.profiles.size()) * (CARD_H + CARD_GAP)
 	return maxf(0.0, content_h - scroll_area_h)
 
@@ -166,7 +166,7 @@ func _update_drag(pos: Vector2) -> void:
 
 
 func _card_index_at(pos: Vector2) -> int:
-	if pos.y < HEADER_H or pos.y > ARENA_HEIGHT - FOOTER_H:
+	if pos.y < HEADER_H or pos.y > _sh - FOOTER_H:
 		return -1
 	var content_y: float = pos.y + _scroll_offset - HEADER_H
 	if content_y < 0.0:
@@ -353,6 +353,9 @@ func _load_stats_cache() -> void:
 # ── Drawing ───────────────────────────────────────────────────────────────────
 
 func _draw() -> void:
+	_sw = get_viewport_rect().size.x
+	_sh = get_viewport_rect().size.y
+	_COL_RIGHT = _sw - 180.0
 	_scroll_offset = clampf(_scroll_offset, 0.0, _max_scroll())
 	_draw_background()
 	_draw_profile_cards()
@@ -366,10 +369,10 @@ func _draw() -> void:
 
 
 func _draw_background() -> void:
-	draw_rect(Rect2(Vector2.ZERO, Vector2(ARENA_WIDTH, ARENA_HEIGHT)),
+	draw_rect(Rect2(Vector2.ZERO, Vector2(_sw, _sh)),
 		Color(0.07, 0.07, 0.12, 1.0))
-	var cx: float = ARENA_WIDTH / 2.0
-	var cy: float = ARENA_HEIGHT / 2.0
+	var cx: float = _sw / 2.0
+	var cy: float = _sh / 2.0
 	var half: float = 380.0; var inset: float = 130.0
 	var pts: PackedVector2Array = [
 		Vector2(cx - half, cy - inset), Vector2(cx - inset, cy - half),
@@ -381,16 +384,16 @@ func _draw_background() -> void:
 		draw_line(pts[i], pts[(i + 1) % pts.size()], Color(0.18, 0.18, 0.28, 1.0), 1.5)
 	var ca: float = 0.07
 	draw_circle(Vector2(0, 0), 200, Color(Color.DODGER_BLUE, ca))
-	draw_circle(Vector2(ARENA_WIDTH, 0), 200, Color(Color.CRIMSON, ca))
-	draw_circle(Vector2(0, ARENA_HEIGHT), 200, Color(Color.FOREST_GREEN, ca))
-	draw_circle(Vector2(ARENA_WIDTH, ARENA_HEIGHT), 200, Color(Color.GOLD, ca))
+	draw_circle(Vector2(_sw, 0), 200, Color(Color.CRIMSON, ca))
+	draw_circle(Vector2(0, _sh), 200, Color(Color.FOREST_GREEN, ca))
+	draw_circle(Vector2(_sw, _sh), 200, Color(Color.GOLD, ca))
 
 
 func _draw_header() -> void:
 	# Opaque background covers any cards that have scrolled into the header area
-	draw_rect(Rect2(0.0, 0.0, ARENA_WIDTH, HEADER_H), Color(0.07, 0.07, 0.12, 1.0))
-	var font := ThemeDB.fallback_font
-	var cx: float = ARENA_WIDTH / 2.0
+	draw_rect(Rect2(0.0, 0.0, _sw, HEADER_H), Color(0.07, 0.07, 0.12, 1.0))
+	var font := FontManager.get_font()
+	var cx: float = _sw / 2.0
 	var title := "PLAYER PROFILES"
 	var tsz: int = 40
 	var tw := font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, tsz).x
@@ -398,18 +401,18 @@ func _draw_header() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, tsz, Color(0, 0, 0, 0.5))
 	draw_string(font, Vector2(cx - tw / 2.0, 70), title,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, tsz, Color.WHITE)
-	draw_line(Vector2(COL_LEFT, 90), Vector2(COL_RIGHT, 90),
+	draw_line(Vector2(COL_LEFT, 90), Vector2(_COL_RIGHT, 90),
 		Color(0.3, 0.3, 0.4, 0.6), 1.0)
 
 
 func _draw_footer() -> void:
-	var font := ThemeDB.fallback_font
-	var cx: float    = ARENA_WIDTH / 2.0
-	var footer_y: float = ARENA_HEIGHT - FOOTER_H
+	var font := FontManager.get_font()
+	var cx: float    = _sw / 2.0
+	var footer_y: float = _sh - FOOTER_H
 
 	# Separator + opaque background
-	draw_line(Vector2(0, footer_y), Vector2(ARENA_WIDTH, footer_y), Color(0.3, 0.3, 0.4, 0.8), 1.0)
-	draw_rect(Rect2(0, footer_y, ARENA_WIDTH, FOOTER_H), Color(0.07, 0.07, 0.12, 1.0))
+	draw_line(Vector2(0, footer_y), Vector2(_sw, footer_y), Color(0.3, 0.3, 0.4, 0.8), 1.0)
+	draw_rect(Rect2(0, footer_y, _sw, FOOTER_H), Color(0.07, 0.07, 0.12, 1.0))
 
 	var btn_top: float = footer_y + 8.0
 
@@ -440,7 +443,7 @@ func _draw_footer() -> void:
 
 
 func _draw_scrollbar() -> void:
-	var scroll_area_h: float = ARENA_HEIGHT - HEADER_H - FOOTER_H
+	var scroll_area_h: float = _sh - HEADER_H - FOOTER_H
 	var content_h: float     = float(ProfileManager.profiles.size()) * (CARD_H + CARD_GAP)
 	if content_h <= scroll_area_h:
 		return
@@ -448,12 +451,12 @@ func _draw_scrollbar() -> void:
 	var thumb_h: float = maxf(24.0, track_h * (scroll_area_h / content_h))
 	var thumb_t: float = _scroll_offset / maxf(1.0, content_h - scroll_area_h)
 	var thumb_y: float = HEADER_H + 4.0 + thumb_t * (track_h - thumb_h)
-	draw_rect(Rect2(ARENA_WIDTH - 8.0, HEADER_H + 4.0, 4.0, track_h), Color(0.2, 0.2, 0.3, 0.6))
-	draw_rect(Rect2(ARENA_WIDTH - 8.0, thumb_y, 4.0, thumb_h), Color(0.55, 0.55, 0.7, 0.9))
+	draw_rect(Rect2(_sw - 8.0, HEADER_H + 4.0, 4.0, track_h), Color(0.2, 0.2, 0.3, 0.6))
+	draw_rect(Rect2(_sw - 8.0, thumb_y, 4.0, thumb_h), Color(0.55, 0.55, 0.7, 0.9))
 
 
 func _draw_profile_cards() -> void:
-	var font := ThemeDB.fallback_font
+	var font := FontManager.get_font()
 	_select_rects.clear()
 	_delete_rects.clear()
 	_rename_rects.clear()
@@ -468,11 +471,11 @@ func _draw_profile_cards() -> void:
 
 		# Screen-space Y for this card (accounts for scroll)
 		var card_y: float  = HEADER_H + float(i) * (CARD_H + CARD_GAP) - _scroll_offset
-		var card_w: float  = COL_RIGHT - COL_LEFT
+		var card_w: float  = _COL_RIGHT - COL_LEFT
 		var card_rect := Rect2(COL_LEFT, card_y, card_w, CARD_H)
 
 		# Skip drawing if fully outside scroll area, but maintain rect arrays
-		var in_view: bool = card_y + CARD_H > HEADER_H and card_y < ARENA_HEIGHT - FOOTER_H
+		var in_view: bool = card_y + CARD_H > HEADER_H and card_y < _sh - FOOTER_H
 
 		if not in_view:
 			_rename_rects.append(Rect2())
@@ -537,7 +540,7 @@ func _draw_profile_cards() -> void:
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.9, 0.9, 1.0, 1.0))
 
 			var sv_w: float = 80.0; var sv_h: float = 34.0
-			var sv_x: float = COL_RIGHT - 185.0
+			var sv_x: float = _COL_RIGHT - 185.0
 			var sv_y: float = card_y + 31.0
 			_rename_save_rect = Rect2(sv_x, sv_y, sv_w, sv_h)
 			var sv_valid: bool = _rename_text.strip_edges().length() > 0
@@ -556,7 +559,7 @@ func _draw_profile_cards() -> void:
 				Color.WHITE if sv_valid else Color(0.35, 0.35, 0.42, 1.0))
 
 			var cn_w: float = 80.0
-			var cn_x: float = COL_RIGHT - 95.0
+			var cn_x: float = _COL_RIGHT - 95.0
 			_rename_cancel_rect = Rect2(cn_x, sv_y, cn_w, sv_h)
 			var cn_hov: bool = hover_section == "rename_cancel"
 			draw_rect(_rename_cancel_rect,
@@ -579,7 +582,7 @@ func _draw_profile_cards() -> void:
 
 			var btn_h: float = 30.0; var btn_y: float = card_y + (CARD_H - btn_h) / 2.0
 
-			var yes_w: float = 80.0; var yes_x: float = COL_RIGHT - 185.0
+			var yes_w: float = 80.0; var yes_x: float = _COL_RIGHT - 185.0
 			_confirm_yes_rect = Rect2(yes_x, btn_y, yes_w, btn_h)
 			var yes_hov: bool = hover_section == "confirm_yes"
 			draw_rect(_confirm_yes_rect,
@@ -589,7 +592,7 @@ func _draw_profile_cards() -> void:
 			draw_string(font, Vector2(yes_x + (yes_w - yw) / 2.0, btn_y + 21.0),
 				"DELETE", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
 
-			var no_w: float = 80.0; var no_x: float = COL_RIGHT - 95.0
+			var no_w: float = 80.0; var no_x: float = _COL_RIGHT - 95.0
 			_confirm_no_rect = Rect2(no_x, btn_y, no_w, btn_h)
 			var no_hov: bool = hover_section == "confirm_no"
 			draw_rect(_confirm_no_rect,
@@ -635,10 +638,10 @@ func _draw_profile_cards() -> void:
 				var badge := "ACTIVE"
 				var bsz: int = 13
 				var bw2 := font.get_string_size(badge, HORIZONTAL_ALIGNMENT_LEFT, -1, bsz).x
-				draw_string(font, Vector2(COL_RIGHT - 20.0 - bw2, card_y + 24.0), badge,
+				draw_string(font, Vector2(_COL_RIGHT - 20.0 - bw2, card_y + 24.0), badge,
 					HORIZONTAL_ALIGNMENT_LEFT, -1, bsz, Color(0.3, 0.9, 0.45, 1.0))
 
-				var rn_w: float = 80.0; var rn_x: float = COL_RIGHT - 100.0
+				var rn_w: float = 80.0; var rn_x: float = _COL_RIGHT - 100.0
 				var rn_y: float = card_y + 42.0
 				var rn_rect := Rect2(rn_x, rn_y, rn_w, 26.0)
 				var rn_hov: bool = hover_section == "rename" and hover_index == i
@@ -654,7 +657,7 @@ func _draw_profile_cards() -> void:
 
 			else:
 				# RENAME
-				var rn_w: float = 80.0; var rn_x: float = COL_RIGHT - 90.0
+				var rn_w: float = 80.0; var rn_x: float = _COL_RIGHT - 90.0
 				var rn_rect := Rect2(rn_x, btn_y, rn_w, btn_h)
 				var rn_hov: bool = hover_section == "rename" and hover_index == i
 				draw_rect(rn_rect,
@@ -668,7 +671,7 @@ func _draw_profile_cards() -> void:
 				_rename_rects.append(rn_rect)
 
 				# DELETE
-				var del_w: float = 80.0; var del_x: float = COL_RIGHT - 180.0
+				var del_w: float = 80.0; var del_x: float = _COL_RIGHT - 180.0
 				var del_rect := Rect2(del_x, btn_y, del_w, btn_h)
 				var can_del: bool = ProfileManager.can_delete(p["id"])
 				var del_hov: bool = can_del and hover_section == "delete" and hover_index == i
@@ -685,7 +688,7 @@ func _draw_profile_cards() -> void:
 					Color(0.9, 0.5, 0.5, 1.0) if can_del else Color(0.3, 0.3, 0.38, 1.0))
 
 				# SELECT
-				var sel_w: float = 90.0; var sel_x: float = COL_RIGHT - 280.0
+				var sel_w: float = 90.0; var sel_x: float = _COL_RIGHT - 280.0
 				var sel_rect := Rect2(sel_x, btn_y, sel_w, btn_h)
 				var sel_hov: bool = hover_section == "select" and hover_index == i
 				draw_rect(sel_rect,
@@ -701,7 +704,7 @@ func _draw_profile_cards() -> void:
 
 
 func _draw_drag_ghost() -> void:
-	var font := ThemeDB.fallback_font
+	var font := FontManager.get_font()
 	var n: int = ProfileManager.profiles.size()
 	if _drag_profile_idx < 0 or _drag_profile_idx >= n:
 		return
@@ -709,18 +712,18 @@ func _draw_drag_ghost() -> void:
 	# Insertion indicator line
 	var line_y: float = HEADER_H + float(_drag_insert_idx) * (CARD_H + CARD_GAP) \
 		- CARD_GAP / 2.0 - _scroll_offset
-	line_y = clampf(line_y, HEADER_H + 2.0, ARENA_HEIGHT - FOOTER_H - 2.0)
-	draw_line(Vector2(COL_LEFT, line_y), Vector2(COL_RIGHT, line_y),
+	line_y = clampf(line_y, HEADER_H + 2.0, _sh - FOOTER_H - 2.0)
+	draw_line(Vector2(COL_LEFT, line_y), Vector2(_COL_RIGHT, line_y),
 		Color(0.35, 0.7, 1.0, 0.9), 2.5)
 	# Small arrow nubs at the ends
 	draw_line(Vector2(COL_LEFT, line_y - 4), Vector2(COL_LEFT, line_y + 4),
 		Color(0.35, 0.7, 1.0, 0.9), 2.0)
-	draw_line(Vector2(COL_RIGHT, line_y - 4), Vector2(COL_RIGHT, line_y + 4),
+	draw_line(Vector2(_COL_RIGHT, line_y - 4), Vector2(_COL_RIGHT, line_y + 4),
 		Color(0.35, 0.7, 1.0, 0.9), 2.0)
 
 	# Ghost card following cursor
 	var p: Dictionary = ProfileManager.profiles[_drag_profile_idx]
-	var card_w: float  = COL_RIGHT - COL_LEFT
+	var card_w: float  = _COL_RIGHT - COL_LEFT
 	var ghost_y: float = _drag_current_pos.y - CARD_H / 2.0
 	var ghost_rect := Rect2(COL_LEFT, ghost_y, card_w, CARD_H)
 	draw_rect(ghost_rect, Color(0.14, 0.22, 0.38, 0.92))

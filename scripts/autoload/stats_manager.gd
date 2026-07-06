@@ -9,19 +9,28 @@ func _stats_path() -> String:
 
 # ── Tracked stats ─────────────────────────────────────────────────────────────
 
-var high_score:              int   = 0
+var high_score:              int   = 0     # Highest score across all modes
+var high_score_normal:       int   = 0
+var high_score_endless:      int   = 0
+var high_score_elimination:  int   = 0
 var total_score:             int   = 0
 var tokens:                  int   = 0     # Persistent currency for buying upgrades
+var total_tokens_earned:     int   = 0     # Lifetime tokens earned (never decremented)
 var xp:                      int   = 0     # Total XP earned (100 XP = 1 level)
 var map_wins:                Dictionary = {} # Wins per map key e.g. {"triangle": 3}
-var games_played:            int   = 0
+var games_played:            int   = 0     # Total across all modes
+var games_played_normal:     int   = 0
+var games_played_endless:    int   = 0
+var games_played_elimination: int  = 0
 var total_time_played:       float = 0.0   # Seconds (across all sessions)
 var wins:                    int   = 0
 var losses:                  int   = 0
+var draws:                   int   = 0
 var achievements_unlocked:   int   = 0
 var powerups_unlocked:       int   = 0
 var modifiers_unlocked:      int   = 0
-var longest_endless_seconds: float = 0.0   # Populated when endless mode ships
+var longest_endless_seconds: float = 0.0
+var longest_elimination_seconds: float = 0.0
 var unlocked_powerups:       Array = []    # IDs of purchased power-ups
 var unlocked_slots:          Array = []    # Slot indices (0-2) whose unlock fee has been paid
 var last_power_up:           String = ""   # Legacy single-slot; kept for compatibility
@@ -38,81 +47,122 @@ func _ready() -> void:
 func load_stats() -> void:
 	# Reset to defaults first so switching to a profile with no save file
 	# doesn't leave the previous profile's data in memory.
-	high_score              = 0
-	total_score             = 0
-	tokens                  = 0
-	xp                      = 0
-	map_wins                = {}
-	games_played            = 0
-	total_time_played       = 0.0
-	wins                    = 0
-	losses                  = 0
-	achievements_unlocked   = 0
-	powerups_unlocked       = 0
-	modifiers_unlocked      = 0
-	longest_endless_seconds = 0.0
-	unlocked_powerups       = []
-	unlocked_slots          = []
-	last_power_up           = ""
-	last_power_up_slots     = ["", "", ""]
-	last_modifiers          = []
+	high_score                   = 0
+	high_score_normal            = 0
+	high_score_endless           = 0
+	high_score_elimination       = 0
+	total_score                  = 0
+	tokens                       = 0
+	total_tokens_earned          = 0
+	xp                           = 0
+	map_wins                     = {}
+	games_played                 = 0
+	games_played_normal          = 0
+	games_played_endless         = 0
+	games_played_elimination     = 0
+	total_time_played            = 0.0
+	wins                         = 0
+	losses                       = 0
+	draws                        = 0
+	achievements_unlocked        = 0
+	powerups_unlocked            = 0
+	modifiers_unlocked           = 0
+	longest_endless_seconds      = 0.0
+	longest_elimination_seconds  = 0.0
+	unlocked_powerups            = []
+	unlocked_slots               = []
+	last_power_up                = ""
+	last_power_up_slots          = ["", "", ""]
+	last_modifiers               = []
 
 	var config := ConfigFile.new()
 	if config.load(_stats_path()) != OK:
 		return  # No save file yet — defaults are already applied above
 
-	high_score              = config.get_value("stats", "high_score",              0)
-	total_score             = config.get_value("stats", "total_score",             0)
-	tokens                  = config.get_value("stats", "tokens",                  0)
-	xp                      = config.get_value("stats", "xp",                      0)
-	map_wins                = config.get_value("stats", "map_wins",                {})
-	games_played            = config.get_value("stats", "games_played",            0)
-	total_time_played       = config.get_value("stats", "total_time_played",       0.0)
-	wins                    = config.get_value("stats", "wins",                    0)
-	losses                  = config.get_value("stats", "losses",                  0)
-	achievements_unlocked   = config.get_value("stats", "achievements_unlocked",   0)
-	powerups_unlocked       = config.get_value("stats", "powerups_unlocked",       0)
-	modifiers_unlocked      = config.get_value("stats", "modifiers_unlocked",      0)
-	longest_endless_seconds = config.get_value("stats", "longest_endless_seconds", 0.0)
-	unlocked_powerups       = config.get_value("stats", "unlocked_powerups",       [])
-	unlocked_slots          = config.get_value("stats", "unlocked_slots",          [])
-	last_power_up           = config.get_value("stats", "last_power_up",           "")
-	last_power_up_slots     = config.get_value("stats", "last_power_up_slots",     ["", "", ""])
-	last_modifiers          = config.get_value("stats", "last_modifiers",          [])
+	high_score                   = config.get_value("stats", "high_score",                   0)
+	high_score_normal            = config.get_value("stats", "high_score_normal",            0)
+	high_score_endless           = config.get_value("stats", "high_score_endless",           0)
+	high_score_elimination       = config.get_value("stats", "high_score_elimination",       0)
+	total_score                  = config.get_value("stats", "total_score",                  0)
+	tokens                       = config.get_value("stats", "tokens",                       0)
+	total_tokens_earned          = config.get_value("stats", "total_tokens_earned",          0)
+	xp                           = config.get_value("stats", "xp",                           0)
+	map_wins                     = config.get_value("stats", "map_wins",                     {})
+	games_played                 = config.get_value("stats", "games_played",                 0)
+	games_played_normal          = config.get_value("stats", "games_played_normal",          0)
+	games_played_endless         = config.get_value("stats", "games_played_endless",         0)
+	games_played_elimination     = config.get_value("stats", "games_played_elimination",     0)
+	total_time_played            = config.get_value("stats", "total_time_played",            0.0)
+	wins                         = config.get_value("stats", "wins",                         0)
+	losses                       = config.get_value("stats", "losses",                       0)
+	draws                        = config.get_value("stats", "draws",                        0)
+	achievements_unlocked        = config.get_value("stats", "achievements_unlocked",        0)
+	powerups_unlocked            = config.get_value("stats", "powerups_unlocked",            0)
+	modifiers_unlocked           = config.get_value("stats", "modifiers_unlocked",           0)
+	longest_endless_seconds      = config.get_value("stats", "longest_endless_seconds",      0.0)
+	longest_elimination_seconds  = config.get_value("stats", "longest_elimination_seconds",  0.0)
+	unlocked_powerups            = config.get_value("stats", "unlocked_powerups",            [])
+	unlocked_slots               = config.get_value("stats", "unlocked_slots",               [])
+	last_power_up                = config.get_value("stats", "last_power_up",                "")
+	last_power_up_slots          = config.get_value("stats", "last_power_up_slots",          ["", "", ""])
+	last_modifiers               = config.get_value("stats", "last_modifiers",               [])
 
 
 func save_stats() -> void:
 	var config := ConfigFile.new()
-	config.set_value("stats", "high_score",              high_score)
-	config.set_value("stats", "total_score",             total_score)
-	config.set_value("stats", "tokens",                  tokens)
-	config.set_value("stats", "xp",                      xp)
-	config.set_value("stats", "map_wins",                map_wins)
-	config.set_value("stats", "games_played",            games_played)
-	config.set_value("stats", "total_time_played",       total_time_played)
-	config.set_value("stats", "wins",                    wins)
-	config.set_value("stats", "losses",                  losses)
-	config.set_value("stats", "achievements_unlocked",   achievements_unlocked)
-	config.set_value("stats", "powerups_unlocked",       powerups_unlocked)
-	config.set_value("stats", "modifiers_unlocked",      modifiers_unlocked)
-	config.set_value("stats", "longest_endless_seconds", longest_endless_seconds)
-	config.set_value("stats", "unlocked_powerups",       unlocked_powerups)
-	config.set_value("stats", "unlocked_slots",          unlocked_slots)
-	config.set_value("stats", "last_power_up",           last_power_up)
-	config.set_value("stats", "last_power_up_slots",     last_power_up_slots)
-	config.set_value("stats", "last_modifiers",          last_modifiers)
+	config.set_value("stats", "high_score",                   high_score)
+	config.set_value("stats", "high_score_normal",            high_score_normal)
+	config.set_value("stats", "high_score_endless",           high_score_endless)
+	config.set_value("stats", "high_score_elimination",       high_score_elimination)
+	config.set_value("stats", "total_score",                  total_score)
+	config.set_value("stats", "tokens",                       tokens)
+	config.set_value("stats", "total_tokens_earned",          total_tokens_earned)
+	config.set_value("stats", "xp",                           xp)
+	config.set_value("stats", "map_wins",                     map_wins)
+	config.set_value("stats", "games_played",                 games_played)
+	config.set_value("stats", "games_played_normal",          games_played_normal)
+	config.set_value("stats", "games_played_endless",         games_played_endless)
+	config.set_value("stats", "games_played_elimination",     games_played_elimination)
+	config.set_value("stats", "total_time_played",            total_time_played)
+	config.set_value("stats", "wins",                         wins)
+	config.set_value("stats", "losses",                       losses)
+	config.set_value("stats", "draws",                        draws)
+	config.set_value("stats", "achievements_unlocked",        achievements_unlocked)
+	config.set_value("stats", "powerups_unlocked",            powerups_unlocked)
+	config.set_value("stats", "modifiers_unlocked",           modifiers_unlocked)
+	config.set_value("stats", "longest_endless_seconds",      longest_endless_seconds)
+	config.set_value("stats", "longest_elimination_seconds",  longest_elimination_seconds)
+	config.set_value("stats", "unlocked_powerups",            unlocked_powerups)
+	config.set_value("stats", "unlocked_slots",               unlocked_slots)
+	config.set_value("stats", "last_power_up",                last_power_up)
+	config.set_value("stats", "last_power_up_slots",          last_power_up_slots)
+	config.set_value("stats", "last_modifiers",               last_modifiers)
 	config.save(_stats_path())
 
 
 # ── Recording ─────────────────────────────────────────────────────────────────
 
-func record_game_end(player_score: int, time_seconds: float, player_won: bool) -> Dictionary:
+func record_game_end(player_score: int, time_seconds: float, player_won: bool, player_drew: bool = false) -> Dictionary:
 	## Call once at the end of each round.
 	## Returns { "tokens_earned": int, "is_new_high_score": bool,
 	##           "xp_earned": int, "level_before": int, "level_after": int }
+	var mode: String = GameConfig.game_mode
+
 	games_played      += 1
 	total_score       += player_score
 	total_time_played += time_seconds
+
+	match mode:
+		"normal":
+			games_played_normal += 1
+		"endless":
+			games_played_endless += 1
+			if time_seconds > longest_endless_seconds:
+				longest_endless_seconds = time_seconds
+		"elimination":
+			games_played_elimination += 1
+			if time_seconds > longest_elimination_seconds:
+				longest_elimination_seconds = time_seconds
 
 	# Capture level before XP is applied so the game over screen can show progression
 	var level_before: int = get_level()
@@ -126,36 +176,50 @@ func record_game_end(player_score: int, time_seconds: float, player_won: bool) -
 		# Track wins per map for unlock progression
 		var map_key: String = GameConfig.selected_map
 		map_wins[map_key] = map_wins.get(map_key, 0) + 1
+	elif player_drew:
+		draws += 1
 	else:
 		losses += 1
 
 	var is_new_high_score: bool = player_score > high_score
 	if is_new_high_score:
 		high_score = player_score
+	match mode:
+		"normal":
+			if player_score > high_score_normal:
+				high_score_normal = player_score
+		"endless":
+			if player_score > high_score_endless:
+				high_score_endless = player_score
+		"elimination":
+			if player_score > high_score_elimination:
+				high_score_elimination = player_score
 
 	# Tokens: 1 per 100 score; halved (integer division) on loss
 	var tokens_earned: int = player_score / 100
 	if not player_won:
 		tokens_earned = tokens_earned / 2
-	tokens += tokens_earned
+	tokens             += tokens_earned
+	total_tokens_earned += tokens_earned
 
 	save_stats()
 	return {
-		"tokens_earned":   tokens_earned,
+		"tokens_earned":     tokens_earned,
 		"is_new_high_score": is_new_high_score,
-		"xp_earned":       xp_earned,
-		"level_before":    level_before,
-		"level_after":     get_level(),
+		"xp_earned":         xp_earned,
+		"level_before":      level_before,
+		"level_after":       get_level(),
 	}
 
 
 func win_loss_ratio() -> String:
-	## Returns win/loss ratio as a string: "1.50", "∞" (no losses), or "—" (no games).
-	if wins == 0 and losses == 0:
+	## Returns (wins + draws) / losses as a string. Draws count as wins.
+	var positive: int = wins + draws
+	if positive == 0 and losses == 0:
 		return "—"
 	if losses == 0:
 		return "∞"
-	return "%.2f" % (float(wins) / float(losses))
+	return "%.2f" % (float(positive) / float(losses))
 
 
 # ── XP & Levels ───────────────────────────────────────────────────────────────

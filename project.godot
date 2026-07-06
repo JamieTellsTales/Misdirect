@@ -21,6 +21,7 @@ GameConfig="*res://scripts/autoload/game_config.gd"
 ProfileManager="*res://scripts/autoload/profile_manager.gd"
 AudioManager="*res://scripts/autoload/audio_manager.gd"
 SettingsManager="*res://scripts/autoload/settings_manager.gd"
+FontManager="*res://scripts/autoload/font_manager.gd"
 StatsManager="*res://scripts/autoload/stats_manager.gd"
 
 [display]
@@ -28,6 +29,7 @@ StatsManager="*res://scripts/autoload/stats_manager.gd"
 window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
 
 [layer_names]
 
@@ -75,3 +77,4 @@ power_up={
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
+anti_aliasing/quality/msaa_2d=1

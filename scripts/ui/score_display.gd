@@ -37,7 +37,7 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	var font := ThemeDB.fallback_font
+	var font := FontManager.get_font()
 	var shadow := Color(0.0, 0.0, 0.0, 0.8)
 
 	var text_color: Color = colour.lightened(0.35)

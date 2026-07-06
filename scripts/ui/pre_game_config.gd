@@ -5,9 +5,6 @@ class_name PreGameConfig
 
 const CornerHUD = preload("res://scripts/ui/corner_hud.gd")
 
-const ARENA_WIDTH:  float = 1280.0
-const ARENA_HEIGHT: float = 720.0
-
 # ── Layout ───────────────────────────────────────────────────────────────────
 const COL_LEFT:      float = 180.0
 const COL_LABEL:     float = 210.0
@@ -232,9 +229,11 @@ func _draw() -> void:
 
 
 func _draw_background() -> void:
-	draw_rect(Rect2(Vector2.ZERO, Vector2(ARENA_WIDTH, ARENA_HEIGHT)), Color(0.07, 0.07, 0.12, 1.0))
-	var cx: float = ARENA_WIDTH / 2.0
-	var cy: float = ARENA_HEIGHT / 2.0
+	var sw: float = get_viewport_rect().size.x
+	var sh: float = get_viewport_rect().size.y
+	draw_rect(Rect2(Vector2.ZERO, Vector2(sw, sh)), Color(0.07, 0.07, 0.12, 1.0))
+	var cx: float = sw / 2.0
+	var cy: float = sh / 2.0
 	var half: float = 380.0
 	var inset: float = 130.0
 	var pts: PackedVector2Array = [
@@ -247,14 +246,15 @@ func _draw_background() -> void:
 		draw_line(pts[i], pts[(i + 1) % pts.size()], Color(0.18, 0.18, 0.28, 1.0), 1.5)
 	var ca: float = 0.08
 	draw_circle(Vector2(0, 0), 200, Color(Color.DODGER_BLUE, ca))
-	draw_circle(Vector2(ARENA_WIDTH, 0), 200, Color(Color.CRIMSON, ca))
-	draw_circle(Vector2(0, ARENA_HEIGHT), 200, Color(Color.FOREST_GREEN, ca))
-	draw_circle(Vector2(ARENA_WIDTH, ARENA_HEIGHT), 200, Color(Color.GOLD, ca))
+	draw_circle(Vector2(sw, 0), 200, Color(Color.CRIMSON, ca))
+	draw_circle(Vector2(0, sh), 200, Color(Color.FOREST_GREEN, ca))
+	draw_circle(Vector2(sw, sh), 200, Color(Color.GOLD, ca))
 
 
 func _draw_header() -> void:
-	var font := ThemeDB.fallback_font
-	var cx: float = ARENA_WIDTH / 2.0
+	var font := FontManager.get_font()
+	var sw: float = get_viewport_rect().size.x
+	var cx: float = sw / 2.0
 
 	var title := "MISDIRECT"
 	var tsz: int = 48
@@ -266,24 +266,24 @@ func _draw_header() -> void:
 
 	var sub := "Pre-Game Setup"
 	var ssz: int = 20
-	var sw := font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, ssz).x
-	draw_string(font, Vector2(cx - sw / 2.0, 100), sub,
+	var sub_w := font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, ssz).x
+	draw_string(font, Vector2(cx - sub_w / 2.0, 100), sub,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, ssz, Color(0.45, 0.45, 0.58, 1.0))
 
 	var pts_text := "%d tokens available" % StatsManager.tokens
 	var pts_sz: int = 16
 	var pts_w := font.get_string_size(pts_text, HORIZONTAL_ALIGNMENT_LEFT, -1, pts_sz).x
-	draw_string(font, Vector2(ARENA_WIDTH - COL_LEFT - pts_w, 98), pts_text,
+	draw_string(font, Vector2(sw - COL_LEFT - pts_w, 98), pts_text,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, pts_sz, Color(0.4, 0.9, 0.4, 1.0))
 
-	draw_line(Vector2(COL_LEFT, 115), Vector2(ARENA_WIDTH - COL_LEFT, 115),
+	draw_line(Vector2(COL_LEFT, 115), Vector2(sw - COL_LEFT, 115),
 		Color(0.3, 0.3, 0.4, 0.6), 1.0)
 
 
 # ── Power-up slots section ────────────────────────────────────────────────────
 
 func _draw_power_up_slots() -> void:
-	var font := ThemeDB.fallback_font
+	var font := FontManager.get_font()
 	slot_start_y = 160.0
 	_slot_assign_rects.clear()
 	_slot_buy_rects.clear()
@@ -398,16 +398,18 @@ func _draw_power_up_slots() -> void:
 
 func _draw_slot_picker() -> void:
 	## Draw the power-up picker overlay for _open_slot_picker.
-	var font := ThemeDB.fallback_font
+	var font := FontManager.get_font()
 	_picker_option_rects.clear()
 	_picker_buy_rects.clear()
 
 	var n_rows: int    = GameConfig.POWER_UPS.size()
 	var picker_h: float = PICKER_HEADER_H + n_rows * PICKER_ROW_H + PICKER_PAD * 2.0
-	var picker_y: float = (ARENA_HEIGHT - picker_h) / 2.0
+	var sh: float = get_viewport_rect().size.y
+	var sw: float = get_viewport_rect().size.x
+	var picker_y: float = (sh - picker_h) / 2.0
 
 	# Dimmer
-	draw_rect(Rect2(Vector2.ZERO, Vector2(ARENA_WIDTH, ARENA_HEIGHT)), Color(0.0, 0.0, 0.0, 0.6))
+	draw_rect(Rect2(Vector2.ZERO, Vector2(sw, sh)), Color(0.0, 0.0, 0.0, 0.6))
 
 	# Panel background
 	draw_rect(Rect2(PICKER_X, picker_y, PICKER_W, picker_h), Color(0.1, 0.1, 0.16, 1.0))
@@ -521,17 +523,18 @@ func _draw_slot_picker() -> void:
 # ── Modifiers section ─────────────────────────────────────────────────────────
 
 func _draw_modifiers() -> void:
-	var font := ThemeDB.fallback_font
+	var font := FontManager.get_font()
+	var sw: float = get_viewport_rect().size.x
 	_modifier_chip_rects.clear()
 
 	draw_line(Vector2(COL_LEFT, modifier_start_y - 48.0),
-		Vector2(ARENA_WIDTH - COL_LEFT, modifier_start_y - 48.0),
+		Vector2(sw - COL_LEFT, modifier_start_y - 48.0),
 		Color(0.3, 0.3, 0.4, 0.4), 1.0)
 
 	_draw_section_header(font, "MODIFIERS", "hover for description — toggle to activate", modifier_start_y - 30.0)
 
 	# Chip grid dimensions
-	var usable_w: float  = ARENA_WIDTH - COL_LEFT * 2.0
+	var usable_w: float  = sw - COL_LEFT * 2.0
 	var chip_w: float    = (usable_w - MOD_CHIP_GAP_X * (MOD_COLS - 1)) / MOD_COLS
 	var level: int       = StatsManager.get_level()
 
@@ -622,8 +625,9 @@ func _draw_modifiers() -> void:
 		var tip_h: float        = 32.0
 		var is_ul: bool         = _is_modifier_unlocked(hov_mod)
 		var tip_bg_col: Color   = Color(0.1, 0.14, 0.22, 0.95) if is_ul else Color(0.1, 0.1, 0.14, 0.95)
-		draw_rect(Rect2(COL_LEFT, tip_y, ARENA_WIDTH - COL_LEFT * 2.0, tip_h), tip_bg_col)
-		draw_rect(Rect2(COL_LEFT, tip_y, ARENA_WIDTH - COL_LEFT * 2.0, tip_h),
+		var sw2: float = get_viewport_rect().size.x
+		draw_rect(Rect2(COL_LEFT, tip_y, sw2 - COL_LEFT * 2.0, tip_h), tip_bg_col)
+		draw_rect(Rect2(COL_LEFT, tip_y, sw2 - COL_LEFT * 2.0, tip_h),
 			Color(0.35, 0.45, 0.65, 0.6) if is_ul else Color(0.3, 0.3, 0.4, 0.4), false, 1.0)
 
 		var tip_text: String
@@ -638,8 +642,8 @@ func _draw_modifiers() -> void:
 
 
 func _draw_buttons() -> void:
-	var font := ThemeDB.fallback_font
-	var cx: float = ARENA_WIDTH / 2.0
+	var font := FontManager.get_font()
+	var cx: float = get_viewport_rect().size.x / 2.0
 
 	# Leave room for the tooltip bar (32px) + spacing
 	var btn_y: float = _modifier_section_end_y + 56.0
@@ -720,7 +724,7 @@ func _draw_checkbox(center: Vector2, checked: bool, hovered: bool) -> void:
 	var border := Color(0.45, 0.45, 0.6, 1.0) if not checked else Color(0.35, 0.95, 0.5, 1.0)
 	draw_rect(rect, border, false, 2.0)
 	if checked:
-		var font := ThemeDB.fallback_font
+		var font := FontManager.get_font()
 		draw_string(font, center + Vector2(-6, 7), "✓",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color.WHITE)
 

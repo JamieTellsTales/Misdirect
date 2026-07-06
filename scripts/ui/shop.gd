@@ -5,9 +5,6 @@ class_name ShopScreen
 
 const CornerHUD = preload("res://scripts/ui/corner_hud.gd")
 
-const ARENA_WIDTH:  float = 1280.0
-const ARENA_HEIGHT: float = 720.0
-
 const CARD_W:   float = 260.0
 const CARD_H:   float = 150.0
 const CARD_GAP: float = 24.0
@@ -69,12 +66,14 @@ func _handle_click(pos: Vector2) -> void:
 # ── Drawing ──────────────────────────────────────────────────────────────────
 
 func _draw() -> void:
-	var font := ThemeDB.fallback_font
-	var cx: float = ARENA_WIDTH  / 2.0
-	var cy: float = ARENA_HEIGHT / 2.0
+	var font := FontManager.get_font()
+	var sw: float = get_viewport_rect().size.x
+	var sh: float = get_viewport_rect().size.y
+	var cx: float = sw / 2.0
+	var cy: float = sh / 2.0
 
 	# Background
-	draw_rect(Rect2(Vector2.ZERO, Vector2(ARENA_WIDTH, ARENA_HEIGHT)), Color(0.07, 0.07, 0.12, 1.0))
+	draw_rect(Rect2(Vector2.ZERO, Vector2(sw, sh)), Color(0.07, 0.07, 0.12, 1.0))
 	_draw_background_deco()
 
 	# Purchasable power-ups only (skip "None" which is always free)
@@ -144,7 +143,7 @@ func _draw() -> void:
 	var hint      := "ESC — back"
 	var hint_size := 13
 	var hint_w    := font.get_string_size(hint, HORIZONTAL_ALIGNMENT_LEFT, -1, hint_size).x
-	draw_string(font, Vector2(cx - hint_w / 2.0, ARENA_HEIGHT - 24.0),
+	draw_string(font, Vector2(cx - hint_w / 2.0, sh - 24.0),
 		hint, HORIZONTAL_ALIGNMENT_LEFT, -1, hint_size, Color(0.3, 0.3, 0.38, 1.0))
 
 	CornerHUD.draw_on(self)
@@ -240,8 +239,10 @@ func _draw_wrapped_text(font: Font, text: String, x: float, y: float,
 
 
 func _draw_background_deco() -> void:
-	var cx: float = ARENA_WIDTH  / 2.0
-	var cy: float = ARENA_HEIGHT / 2.0
+	var sw: float = get_viewport_rect().size.x
+	var sh: float = get_viewport_rect().size.y
+	var cx: float = sw / 2.0
+	var cy: float = sh / 2.0
 	var half: float  = 380.0
 	var inset: float = 130.0
 	var pts: PackedVector2Array = [
@@ -255,6 +256,6 @@ func _draw_background_deco() -> void:
 
 	var ca: float = 0.08
 	draw_circle(Vector2(0, 0), 200, Color(Color.DODGER_BLUE, ca))
-	draw_circle(Vector2(ARENA_WIDTH, 0), 200, Color(Color.CRIMSON, ca))
-	draw_circle(Vector2(0, ARENA_HEIGHT), 200, Color(Color.FOREST_GREEN, ca))
-	draw_circle(Vector2(ARENA_WIDTH, ARENA_HEIGHT), 200, Color(Color.GOLD, ca))
+	draw_circle(Vector2(sw, 0), 200, Color(Color.CRIMSON, ca))
+	draw_circle(Vector2(0, sh), 200, Color(Color.FOREST_GREEN, ca))
+	draw_circle(Vector2(sw, sh), 200, Color(Color.GOLD, ca))

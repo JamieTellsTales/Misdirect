@@ -3,10 +3,10 @@ extends Node2D
 ## Also used when adding a new profile from the profile select screen.
 ## All drawing done via _draw() consistent with the rest of the UI codebase.
 
-const ARENA_WIDTH:  float = 1280.0
-const ARENA_HEIGHT: float = 720.0
+var _sw: float = 1280.0
+var _sh: float = 720.0
 const COL_LEFT:     float = 180.0
-const COL_RIGHT:    float = ARENA_WIDTH - 180.0
+var _COL_RIGHT: float = 1280.0 - 180.0
 const MAX_NAME:     int   = 20
 
 # ── State ─────────────────────────────────────────────────────────────────────
@@ -161,6 +161,9 @@ func _on_settings_done() -> void:
 # ── Drawing ──────────────────────────────────────────────────────────────────
 
 func _draw() -> void:
+	_sw = get_viewport_rect().size.x
+	_sh = get_viewport_rect().size.y
+	_COL_RIGHT = _sw - 180.0
 	_draw_background()
 	_draw_header()
 	_draw_name_field()
@@ -171,11 +174,11 @@ func _draw() -> void:
 
 
 func _draw_background() -> void:
-	draw_rect(Rect2(Vector2.ZERO, Vector2(ARENA_WIDTH, ARENA_HEIGHT)),
+	draw_rect(Rect2(Vector2.ZERO, Vector2(_sw, _sh)),
 		Color(0.07, 0.07, 0.12, 1.0))
 
-	var cx: float = ARENA_WIDTH / 2.0
-	var cy: float = ARENA_HEIGHT / 2.0
+	var cx: float = _sw / 2.0
+	var cy: float = _sh / 2.0
 	var half: float = 380.0
 	var inset: float = 130.0
 	var pts: PackedVector2Array = [
@@ -189,14 +192,14 @@ func _draw_background() -> void:
 
 	var ca: float = 0.07
 	draw_circle(Vector2(0, 0), 200, Color(Color.DODGER_BLUE, ca))
-	draw_circle(Vector2(ARENA_WIDTH, 0), 200, Color(Color.CRIMSON, ca))
-	draw_circle(Vector2(0, ARENA_HEIGHT), 200, Color(Color.FOREST_GREEN, ca))
-	draw_circle(Vector2(ARENA_WIDTH, ARENA_HEIGHT), 200, Color(Color.GOLD, ca))
+	draw_circle(Vector2(_sw, 0), 200, Color(Color.CRIMSON, ca))
+	draw_circle(Vector2(0, _sh), 200, Color(Color.FOREST_GREEN, ca))
+	draw_circle(Vector2(_sw, _sh), 200, Color(Color.GOLD, ca))
 
 
 func _draw_header() -> void:
-	var font := ThemeDB.fallback_font
-	var cx: float = ARENA_WIDTH / 2.0
+	var font := FontManager.get_font()
+	var cx: float = _sw / 2.0
 
 	var title := "MISDIRECT"
 	var tsz: int = 48
@@ -212,12 +215,12 @@ func _draw_header() -> void:
 	draw_string(font, Vector2(cx - sw / 2.0, 100), sub,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, ssz, Color(0.45, 0.45, 0.58, 1.0))
 
-	draw_line(Vector2(COL_LEFT, 115), Vector2(COL_RIGHT, 115),
+	draw_line(Vector2(COL_LEFT, 115), Vector2(_COL_RIGHT, 115),
 		Color(0.3, 0.3, 0.4, 0.6), 1.0)
 
 
 func _draw_name_field() -> void:
-	var font := ThemeDB.fallback_font
+	var font := FontManager.get_font()
 	var section_y: float = 155.0
 
 	# Section label
@@ -227,7 +230,7 @@ func _draw_name_field() -> void:
 	# Input box
 	var box_y: float = section_y + 12.0
 	var box_h: float = 44.0
-	_name_box_rect = Rect2(COL_LEFT, box_y, COL_RIGHT - COL_LEFT, box_h)
+	_name_box_rect = Rect2(COL_LEFT, box_y, _COL_RIGHT - COL_LEFT, box_h)
 
 	draw_rect(_name_box_rect, Color(0.1, 0.1, 0.18, 1.0))
 	draw_rect(_name_box_rect, Color(0.35, 0.55, 0.9, 0.85), false, 2.0)
@@ -241,16 +244,16 @@ func _draw_name_field() -> void:
 	var count_text := "%d / %d" % [name_text.length(), MAX_NAME]
 	var csz: int = 13
 	var cw := font.get_string_size(count_text, HORIZONTAL_ALIGNMENT_LEFT, -1, csz).x
-	draw_string(font, Vector2(COL_RIGHT - cw, box_y + 58.0), count_text,
+	draw_string(font, Vector2(_COL_RIGHT - cw, box_y + 58.0), count_text,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, csz, Color(0.4, 0.4, 0.5, 0.8))
 
 
 func _draw_sections() -> void:
-	var font := ThemeDB.fallback_font
+	var font := FontManager.get_font()
 	var start_y: float = 290.0
 	var row_h: float   = 56.0
 
-	draw_line(Vector2(COL_LEFT, start_y - 12.0), Vector2(COL_RIGHT, start_y - 12.0),
+	draw_line(Vector2(COL_LEFT, start_y - 12.0), Vector2(_COL_RIGHT, start_y - 12.0),
 		Color(0.3, 0.3, 0.4, 0.4), 1.0)
 
 	# ── Localisation (placeholder) ─────────────────────────────────────────────
@@ -290,13 +293,13 @@ func _draw_sections() -> void:
 		Color(0.75, 0.85, 1.0, 1.0) if is_set_hov else Color(0.55, 0.65, 0.85, 1.0))
 
 	draw_line(Vector2(COL_LEFT, start_y + row_h * 3.0 + 12.0),
-		Vector2(COL_RIGHT, start_y + row_h * 3.0 + 12.0),
+		Vector2(_COL_RIGHT, start_y + row_h * 3.0 + 12.0),
 		Color(0.3, 0.3, 0.4, 0.4), 1.0)
 
 
 func _draw_create_button() -> void:
-	var font := ThemeDB.fallback_font
-	var cx: float = ARENA_WIDTH / 2.0
+	var font := FontManager.get_font()
+	var cx: float = _sw / 2.0
 	var btn_y: float = 590.0
 	var btn_w: float = 260.0
 	var btn_h: float = 52.0
@@ -335,7 +338,7 @@ func _draw_create_button() -> void:
 
 
 func _draw_back_button() -> void:
-	var font := ThemeDB.fallback_font
+	var font := FontManager.get_font()
 	var bw: float = 120.0
 	var bh: float = 36.0
 	_back_rect = Rect2(COL_LEFT, 590.0 + 8.0, bw, bh)

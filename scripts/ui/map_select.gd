@@ -6,9 +6,6 @@ extends Node2D
 const ColourData = preload("res://scripts/resources/department_data.gd")
 const CornerHUD  = preload("res://scripts/ui/corner_hud.gd")
 
-const ARENA_WIDTH:  float = 1280.0
-const ARENA_HEIGHT: float = 720.0
-
 # ── Layout constants ───────────────────────────────────────────────────────────
 
 const CARD_W:       float = 260.0
@@ -16,16 +13,6 @@ const CARD_H:       float = 200.0
 const CARD_COL_GAP: float = 20.0   # horizontal gap between columns
 const CARD_ROW_GAP: float = 15.0   # vertical gap between rows
 const CARDS_TOP_Y:  float = 90.0
-
-# 6 cards in a 2×3 grid (row 1: triangle/square/pentagon, row 2: hexagon/heptagon/octagon)
-const CARD_CENTRES: Array = [
-	Vector2(1280.0 / 2.0 - CARD_W - CARD_COL_GAP, CARDS_TOP_Y + CARD_H / 2.0),
-	Vector2(1280.0 / 2.0,                           CARDS_TOP_Y + CARD_H / 2.0),
-	Vector2(1280.0 / 2.0 + CARD_W + CARD_COL_GAP,  CARDS_TOP_Y + CARD_H / 2.0),
-	Vector2(1280.0 / 2.0 - CARD_W - CARD_COL_GAP,  CARDS_TOP_Y + CARD_H + CARD_ROW_GAP + CARD_H / 2.0),
-	Vector2(1280.0 / 2.0,                            CARDS_TOP_Y + CARD_H + CARD_ROW_GAP + CARD_H / 2.0),
-	Vector2(1280.0 / 2.0 + CARD_W + CARD_COL_GAP,   CARDS_TOP_Y + CARD_H + CARD_ROW_GAP + CARD_H / 2.0),
-]
 
 const MAP_NAMES: Array = ["TRIANGLE", "SQUARE", "PENTAGON", "HEXAGON", "HEPTAGON", "OCTAGON"]
 const MAP_KEYS:  Array = ["triangle", "square", "pentagon", "hexagon", "heptagon", "octagon"]
@@ -71,8 +58,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_handle_click(event.position)
 
+	if event.is_action_pressed("ui_accept"):
+		AudioManager.play_button_click()
+		GameConfig.selected_map = MAP_KEYS[selected_map_index]
+		GameConfig.num_players  = num_players
+		get_tree().change_scene_to_file("res://scenes/pre_game_config.tscn")
+
 	if event.is_action_pressed("ui_cancel"):
-		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+		get_tree().change_scene_to_file("res://scenes/mode_select.tscn")
 
 
 func _update_hover(pos: Vector2) -> void:
@@ -130,7 +123,7 @@ func _handle_click(pos: Vector2) -> void:
 
 	if _back_rect.has_point(pos):
 		AudioManager.play_button_click()
-		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+		get_tree().change_scene_to_file("res://scenes/mode_select.tscn")
 		return
 
 
@@ -161,15 +154,17 @@ func _draw() -> void:
 
 
 func _draw_background() -> void:
-	draw_rect(Rect2(Vector2.ZERO, Vector2(ARENA_WIDTH, ARENA_HEIGHT)),
+	var sw: float = get_viewport_rect().size.x
+	var sh: float = get_viewport_rect().size.y
+	draw_rect(Rect2(Vector2.ZERO, Vector2(sw, sh)),
 		Color(0.07, 0.07, 0.12, 1.0))
-	var cx: float = ARENA_WIDTH / 2.0
-	var cy: float = ARENA_HEIGHT / 2.0
+	var cx: float = sw / 2.0
+	var cy: float = sh / 2.0
 	var ca: float = 0.07
-	draw_circle(Vector2(0, 0),            200, Color(Color.DODGER_BLUE,    ca))
-	draw_circle(Vector2(ARENA_WIDTH, 0),  200, Color(Color.CRIMSON,        ca))
-	draw_circle(Vector2(0, ARENA_HEIGHT), 200, Color(Color.FOREST_GREEN,   ca))
-	draw_circle(Vector2(ARENA_WIDTH, ARENA_HEIGHT), 200, Color(Color.GOLD, ca))
+	draw_circle(Vector2(0, 0),   200, Color(Color.DODGER_BLUE,    ca))
+	draw_circle(Vector2(sw, 0),  200, Color(Color.CRIMSON,        ca))
+	draw_circle(Vector2(0, sh),  200, Color(Color.FOREST_GREEN,   ca))
+	draw_circle(Vector2(sw, sh), 200, Color(Color.GOLD, ca))
 	# Subtle octagon grid lines
 	var half: float = 380.0; var inset: float = 130.0
 	var pts: PackedVector2Array = [
@@ -183,8 +178,8 @@ func _draw_background() -> void:
 
 
 func _draw_header() -> void:
-	var font := ThemeDB.fallback_font
-	var cx: float = ARENA_WIDTH / 2.0
+	var font := FontManager.get_font()
+	var cx: float = get_viewport_rect().size.x / 2.0
 	var title := "SELECT MAP"
 	var tsz: int = 40
 	var tw := font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, tsz).x
@@ -192,16 +187,26 @@ func _draw_header() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, tsz, Color(0, 0, 0, 0.5))
 	draw_string(font, Vector2(cx - tw / 2.0, 60), title,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, tsz, Color.WHITE)
-	draw_line(Vector2(180, 78), Vector2(ARENA_WIDTH - 180, 78),
+	draw_line(Vector2(cx - 460, 78), Vector2(cx + 460, 78),
 		Color(0.3, 0.3, 0.4, 0.6), 1.0)
 
 
 func _draw_cards() -> void:
-	var font := ThemeDB.fallback_font
+	var font := FontManager.get_font()
 	_card_rects.clear()
 
+	var cx: float = get_viewport_rect().size.x / 2.0
+	var card_centres: Array = [
+		Vector2(cx - CARD_W - CARD_COL_GAP, CARDS_TOP_Y + CARD_H / 2.0),
+		Vector2(cx,                          CARDS_TOP_Y + CARD_H / 2.0),
+		Vector2(cx + CARD_W + CARD_COL_GAP, CARDS_TOP_Y + CARD_H / 2.0),
+		Vector2(cx - CARD_W - CARD_COL_GAP, CARDS_TOP_Y + CARD_H + CARD_ROW_GAP + CARD_H / 2.0),
+		Vector2(cx,                          CARDS_TOP_Y + CARD_H + CARD_ROW_GAP + CARD_H / 2.0),
+		Vector2(cx + CARD_W + CARD_COL_GAP, CARDS_TOP_Y + CARD_H + CARD_ROW_GAP + CARD_H / 2.0),
+	]
+
 	for i in 6:
-		var centre: Vector2 = CARD_CENTRES[i]
+		var centre: Vector2 = card_centres[i]
 		var rect := Rect2(centre - Vector2(CARD_W / 2.0, CARD_H / 2.0),
 			Vector2(CARD_W, CARD_H))
 		_card_rects.append(rect)
@@ -361,8 +366,8 @@ func _draw_map_preview(centre: Vector2, map_key: String, supported: bool, locked
 		var dot_pos: Vector2 = mid + outward * 12.0
 		var ct: int = _slot_colour(slot)
 		var dot_col: Color = ColourData.get_color(ct)
-		draw_circle(dot_pos, 7.0, Color(dot_col, 0.9))
-		draw_arc(dot_pos, 7.0, 0, TAU, 12, Color(dot_col.lightened(0.3), 1.0), 1.5)
+		draw_circle(dot_pos, 7.0, Color(dot_col, 0.9), true, -1.0, true)
+		draw_arc(dot_pos, 7.0, 0, TAU, 32, Color(dot_col.lightened(0.3), 1.0), 1.0, true)
 
 
 func _slot_colour(slot: int) -> int:
@@ -380,8 +385,8 @@ func _slot_colour(slot: int) -> int:
 
 
 func _draw_player_count_row() -> void:
-	var font := ThemeDB.fallback_font
-	var cx: float = ARENA_WIDTH / 2.0
+	var font := FontManager.get_font()
+	var cx: float = get_viewport_rect().size.x / 2.0
 	var row_y: float = CARDS_TOP_Y + 2.0 * CARD_H + CARD_ROW_GAP + 22.0
 
 	# Label
@@ -420,9 +425,9 @@ func _draw_player_count_row() -> void:
 			var dot_x: float = cx - total_w / 2.0 + slot * dot_spacing
 			var ct: int = _slot_colour(slot)
 			var col: Color = ColourData.get_color(ct)
-			draw_circle(Vector2(dot_x, dot_row_y + 10.0), 10.0, Color(col, 0.9))
-			draw_arc(Vector2(dot_x, dot_row_y + 10.0), 10.0, 0, TAU, 16,
-				Color(col.lightened(0.3), 1.0), 1.5)
+			draw_circle(Vector2(dot_x, dot_row_y + 10.0), 10.0, Color(col, 0.9), true, -1.0, true)
+			draw_arc(Vector2(dot_x, dot_row_y + 10.0), 10.0, 0, TAU, 48,
+				Color(col.lightened(0.3), 1.0), 1.0, true)
 			# "YOU" label under player dot
 			if slot == 0:
 				var you_lbl := "YOU"
@@ -439,7 +444,7 @@ func _draw_player_count_row() -> void:
 
 
 func _draw_arrow_button(rect: Rect2, label: String, hovered: bool, enabled: bool) -> void:
-	var font := ThemeDB.fallback_font
+	var font := FontManager.get_font()
 	if enabled:
 		draw_rect(rect,
 			Color(0.25, 0.35, 0.55, 1.0) if hovered else Color(0.15, 0.22, 0.38, 1.0))
@@ -455,9 +460,9 @@ func _draw_arrow_button(rect: Rect2, label: String, hovered: bool, enabled: bool
 
 
 func _draw_bottom_buttons() -> void:
-	var font := ThemeDB.fallback_font
-	var cx: float = ARENA_WIDTH / 2.0
-	var by: float = ARENA_HEIGHT - 54.0   # Smaller buttons sit closer to the bottom edge
+	var font := FontManager.get_font()
+	var cx: float = get_viewport_rect().size.x / 2.0
+	var by: float = get_viewport_rect().size.y - 54.0   # Smaller buttons sit closer to the bottom edge
 
 	# NEXT →
 	var nx_w: float = 150.0; var nx_h: float = 36.0

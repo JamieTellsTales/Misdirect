@@ -46,6 +46,12 @@ const POWER_UPS: Array = [
 		"price": 100,
 	},
 	{
+		"id": "deflector",
+		"label": "Deflector",
+		"desc": "Your paddle becomes a triangle that angles balls sideways on impact",
+		"price": 75,
+	},
+	{
 		"id": "cyclone",
 		"label": "Cyclone",
 		"desc": "Hold key to spin nearby balls wildly around your paddle",
@@ -87,6 +93,12 @@ const MODIFIERS: Array = [
 		"unlock_level": 6,
 	},
 	{
+		"id": "final_countdown",
+		"label": "Final Countdown",
+		"desc": "In the last 10 seconds, balls spawn at double frequency",
+		"unlock_level": 8,
+	},
+	{
 		"id": "speed_ball",
 		"label": "Speed Ball",
 		"desc": "All balls move at double speed — your final score is doubled to compensate",
@@ -97,6 +109,12 @@ const MODIFIERS: Array = [
 		"label": "Black Hole",
 		"desc": "A black hole at the centre pulls balls in and destroys them",
 		"unlock_level": 12,
+	},
+	{
+		"id": "gravity_wells",
+		"label": "Gravity Wells",
+		"desc": "Roaming gravity wells pull balls off course — but don't destroy them",
+		"unlock_level": 14,
 	},
 	{
 		"id": "pillars",
@@ -132,6 +150,7 @@ var power_up_slots: Array = ["", "", ""]  # Power-up ID assigned to each slot; "
 var active_modifiers: Array = []    # e.g. ["random_directions", "rotated_colours"]
 var selected_map: String = "square"
 var num_players: int = 4            # Total zones including player
+var game_mode: String = "normal"    # "normal", "endless", "elimination"
 
 ## Which polygon sides are active per (map, player-count). Side 0 = player (bottom).
 ## All selections are symmetric around the vertical axis through side 0 where possible.
@@ -183,6 +202,7 @@ func reset() -> void:
 	selected_power_up = ""
 	power_up_slots = ["", "", ""]
 	active_modifiers = []
+	game_mode = "normal"
 	# selected_map and num_players are intentionally NOT reset here —
 	# they are set by the map select screen and should persist into the arena.
 
