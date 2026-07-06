@@ -133,6 +133,10 @@ func _process(delta: float) -> void:
 	if GameConfig.has_modifier("final_countdown") and GameConfig.game_mode == "normal":
 		if round_duration - session_time <= 10.0:
 			effective_interval /= 2.0
+	# Endless difficulty ramp: spawn interval shrinks 2% per 10 s, floored at
+	# 40% so long runs stay survivable but demand real skill.
+	if GameConfig.game_mode == "endless":
+		effective_interval *= maxf(0.4, 1.0 - session_time / 10.0 * 0.02)
 
 	spawn_timer += delta
 	if spawn_timer >= effective_interval:
@@ -608,11 +612,13 @@ func _on_pause_settings() -> void:
 
 func _on_settings_done() -> void:
 	settings_overlay = null
-	# Window may have been resized — physics nodes are already placed at
-	# old canvas positions so a full scene reload is the cleanest recovery.
-	# SceneTree.paused persists across scene changes so clear it first.
-	get_tree().paused = false
-	get_tree().reload_current_scene()
+	# Resume where the player left off — no scene reload, so the round keeps
+	# its state. Resolution changes apply live; the arena keeps its current
+	# geometry (same-aspect resolution changes don't move the canvas).
+	if pause_menu and pause_menu.is_open:
+		pause_menu.show_after_settings()
+	else:
+		get_tree().paused = false
 
 
 func _on_pause_exit() -> void:
@@ -1033,6 +1039,11 @@ func _lose_life(ct: int) -> void:
 		return
 	_lives[ct] = max(0, _lives.get(ct, 0) - 1)
 	queue_redraw()
+	# Elimination: an AI paddle on its last life plays sharper.
+	if _lives[ct] == 1 and GameConfig.game_mode == "elimination":
+		var p = paddles.get(ct)
+		if p and p.has_method("enter_desperation"):
+			p.enter_desperation()
 	if _lives[ct] == 0:
 		if GameConfig.game_mode == "elimination":
 			_collapse_zone(ct)

@@ -37,11 +37,18 @@ var can_split: bool = true
 # Cooldown to prevent multiple split signals from one collision
 var split_cooldown: float = 0.0
 
+# Erratic Balls / Surge Balls modifier timers (staggered per ball)
+var _erratic_timer: float = 0.0
+var _surge_timer:   float = 0.0
+
 
 func _ready() -> void:
 	add_to_group("balls")
 	_apply_size()
 	queue_redraw()
+
+	_erratic_timer = randf_range(0.6, 1.6)
+	_surge_timer   = randf_range(0.8, 2.0)
 
 	body_entered.connect(_on_body_entered)
 	contact_monitor = true
@@ -80,6 +87,21 @@ func _physics_process(delta: float) -> void:
 	if split_cooldown > 0:
 		split_cooldown -= delta
 
+	# Erratic Balls: random direction jinks mid-flight
+	if GameConfig.has_modifier("erratic_balls"):
+		_erratic_timer -= delta
+		if _erratic_timer <= 0.0:
+			_erratic_timer = randf_range(0.6, 1.6)
+			linear_velocity = linear_velocity.rotated(randf_range(-PI / 4.0, PI / 4.0))
+
+	# Surge Balls: random speed changes within the ball's size-scaled band
+	if GameConfig.has_modifier("surge_balls"):
+		_surge_timer -= delta
+		if _surge_timer <= 0.0 and linear_velocity.length_squared() > 0.0:
+			_surge_timer = randf_range(0.8, 2.0)
+			var new_speed: float = randf_range(min_speed, max_speed) * speed_multiplier
+			linear_velocity = linear_velocity.normalized() * new_speed
+
 
 func _clamp_speed() -> void:
 	var effective_max: float = max_speed * speed_multiplier
@@ -104,11 +126,15 @@ func _on_body_entered(body: Node) -> void:
 				var boosted_speed: float = max_speed * speed_multiplier * 1.8
 				linear_velocity = linear_velocity.normalized() * boosted_speed
 
-			# ── Split power-ups (first matching slot wins) ────────────────
+			# ── Split power-ups ───────────────────────────────────────────
 			if can_split and split_cooldown <= 0.0:
 				if GameConfig.has_power_up_in_slot("multi_shot"):
 					split_cooldown = 0.5
-					request_split.emit(self, randi_range(2, 5), PI / 5.0)
+					var count: int = randi_range(2, 5)
+					# Double Rebound synergy: doubles Multi Shot's output
+					if GameConfig.has_power_up_in_slot("double_rebound"):
+						count *= 2
+					request_split.emit(self, count, PI / 5.0)
 				elif GameConfig.has_power_up_in_slot("clone"):
 					split_cooldown = 0.5
 					request_split.emit(self, 2, 0.05)

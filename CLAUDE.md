@@ -40,13 +40,15 @@ BLUE, GREEN, RED, YELLOW, PURPLE, ORANGE, CYAN, PINK. Up to 8 players/zones.
 AI personalities live in `ai_paddle.gd::_apply_personality()` — each colour has its
 own `reaction_delay`, `accuracy`, `move_speed`, `prediction_strength`, plus quirks
 (RED deflects its own colour, YELLOW ignores purple, BLUE panics with many balls,
-PURPLE is slow and inaccurate).
+PURPLE is slow and inaccurate). In elimination, an AI on its last life gets
+`enter_desperation()` — sharper stats so cornered zones fight back.
 
 ### Game Modes (`GameConfig.game_mode`)
 - **normal** — timed round (`round_duration`, default 120s). Highest score wins;
   ties are draws. Wrong catch deducts score (floor 0).
 - **endless** — no timer. Player has 3 lives; wrong catch costs a life (not score);
   +1 life per 100 points milestone. Game ends when lives hit 0 (`_end_round(true)`).
+  Difficulty ramps: spawn interval shrinks 2% per 10s (floor 40%).
   Endless never counts toward wins/draws/losses and always pays tokens at the
   full (win) rate — longest run and high score are its success metrics.
 - **elimination** — no timer. Every zone has 3 lives. At 0 lives, the zone is
@@ -76,9 +78,12 @@ heptagon, octagon. Maps unlock via wins on the previous map
   (railgun, splits, deflector) in `ball.gd` / `paddle.gd`.
 - **Modifiers** (`GameConfig.MODIFIERS`) are free toggles unlocked by level:
   rotated_colours, chaos_ball, load_balanced, random_directions, extra_time,
-  final_countdown, return_to_sender, speed_ball, black_hole, gravity_wells,
-  pillars. Implemented in arena.gd (spawn logic, `_tick_black_hole`,
-  `_tick_gravity_well`, pillars) and colour_zone.gd (return_to_sender).
+  final_countdown, return_to_sender, speed_ball, erratic_balls, black_hole,
+  surge_balls, gravity_wells, pillars. Implemented in arena.gd (spawn logic,
+  `_tick_black_hole`, `_tick_gravity_well`, pillars), colour_zone.gd
+  (return_to_sender), and ball.gd (erratic_balls, surge_balls).
+- Split power-ups don't stack as separate splits — Multi Shot takes priority,
+  and Double Rebound doubles Multi Shot's output when both are equipped.
 
 ---
 
@@ -197,8 +202,9 @@ signal ball_caught(ball: Ball)
   always `get_tree().paused = false` before reloading or leaving.
 - game_over_screen and pause overlays use `PROCESS_MODE_ALWAYS`; the arena pauses
   the tree when results show.
-- Closing settings mid-game reloads the arena scene (physics nodes can't be
-  repositioned safely after a resolution change) — this restarts the round.
+- Closing settings mid-game returns to the pause menu without reloading —
+  the round keeps its state. Resolution changes apply live; the arena keeps
+  the geometry it was built with (fine for same-aspect changes).
 
 ### Physics
 - Paddles: `CharacterBody2D`, moved along a slide axis (`move_direction`,

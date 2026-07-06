@@ -24,7 +24,7 @@ const POWER_UPS: Array = [
 	{
 		"id": "double_rebound",
 		"label": "Double Rebound",
-		"desc": "Each ball hitting your paddle splits into two",
+		"desc": "Each ball hitting your paddle splits into two — doubles Multi Shot's output when equipped together",
 		"price": 75,
 	},
 	{
@@ -111,10 +111,22 @@ const MODIFIERS: Array = [
 		"unlock_level": 10,
 	},
 	{
+		"id": "erratic_balls",
+		"label": "Erratic Balls",
+		"desc": "Balls randomly change direction mid-flight",
+		"unlock_level": 11,
+	},
+	{
 		"id": "black_hole",
 		"label": "Black Hole",
 		"desc": "A black hole at the centre pulls balls in and destroys them",
 		"unlock_level": 12,
+	},
+	{
+		"id": "surge_balls",
+		"label": "Surge Balls",
+		"desc": "Balls randomly speed up and slow down",
+		"unlock_level": 13,
 	},
 	{
 		"id": "gravity_wells",

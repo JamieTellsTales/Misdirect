@@ -65,6 +65,16 @@ func _apply_personality() -> void:
 			prediction_strength = 0.5
 
 
+func enter_desperation() -> void:
+	## Elimination mode: called by arena.gd when this paddle drops to its last
+	## life. The AI plays scared — faster reactions, better accuracy, quicker
+	## movement — so a cornered zone is visibly harder to finish off.
+	reaction_delay      = maxf(0.03, reaction_delay * 0.5)
+	accuracy            = minf(0.98, accuracy + 0.15)
+	move_speed         *= 1.25
+	prediction_strength = minf(1.0, prediction_strength + 0.2)
+
+
 func _physics_process(delta: float) -> void:
 	reaction_timer += delta
 	if reaction_timer >= reaction_delay:
