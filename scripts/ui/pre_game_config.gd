@@ -83,10 +83,10 @@ func _process(_delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
-		_update_hover(event.position)
+		_update_hover(get_global_mouse_position())
 
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_handle_click(event.position)
+		_handle_click(get_global_mouse_position())
 
 	if event.is_action_pressed("ui_cancel"):
 		if _open_slot_picker >= 0:

@@ -47,6 +47,8 @@ PURPLE is slow and inaccurate).
   ties are draws. Wrong catch deducts score (floor 0).
 - **endless** — no timer. Player has 3 lives; wrong catch costs a life (not score);
   +1 life per 100 points milestone. Game ends when lives hit 0 (`_end_round(true)`).
+  Endless never counts toward wins/draws/losses and always pays tokens at the
+  full (win) rate — longest run and high score are its success metrics.
 - **elimination** — no timer. Every zone has 3 lives. At 0 lives, the zone is
   collapsed (`_collapse_zone`): paddle/zone/score display removed and the edge is
   sealed with a wall. Player collapse ends the game; otherwise last zone standing wins.
@@ -55,9 +57,10 @@ Lives are drawn as dots near each score display (`_draw_lives` in arena.gd).
 
 ### Balls
 - Random size 0.5–2.0; smaller = faster, bigger = more points (10–30).
-- Wrong-catch penalty chain exists on the ball (`apply_wrong_catch_penalty`:
-  speed-up, then blame stamp) **but is currently never called** — zones destroy
-  every ball they catch. Known gap vs the original design.
+- Correct catches destroy the ball and score. Wrong catches do NOT destroy it:
+  the zone applies the penalty chain (`apply_wrong_catch_penalty`: speed-up,
+  then blame stamp) and reflects the ball back into the arena (`_bounce_back`
+  in department_zone.gd).
 
 ### Maps & Player Counts
 `GameConfig.MAP_VALID_PLAYERS` / `MAP_ZONE_SIDES` define which polygon sides are

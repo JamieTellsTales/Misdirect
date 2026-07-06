@@ -107,7 +107,7 @@ func _calculate_threat(ball: Node2D) -> float:
 	if approach_speed <= 0:
 		return -1.0
 
-	var threat: float = approach_speed / (distance + 100.0)
+	var threat: float = approach_speed / (distance + 100.0 * arena_scale)
 
 	# Blue panic: degrades accuracy when many balls are active.
 	if colour_type == ColourData.ColourType.BLUE:
@@ -129,7 +129,7 @@ func _calculate_target_offset() -> void:
 	if randf() > accuracy:
 		# Jitter perpendicular to the slide axis
 		var perp := move_direction.rotated(PI / 2.0)
-		predicted_pos += perp * randf_range(-100.0, 100.0)
+		predicted_pos += perp * randf_range(-100.0, 100.0) * arena_scale
 
 	target_offset = (predicted_pos - zone_centre).dot(move_direction)
 	target_offset = clampf(target_offset, min_offset, max_offset)
@@ -138,11 +138,11 @@ func _calculate_target_offset() -> void:
 func _move_toward_target(delta: float) -> void:
 	var dist: float = target_offset - get_slide_offset()
 
-	if abs(dist) < 5.0:
+	if abs(dist) < 5.0 * arena_scale:
 		velocity = Vector2.ZERO
 		return
 
-	velocity = move_direction * sign(dist) * move_speed
+	velocity = move_direction * sign(dist) * move_speed * arena_scale
 	move_and_slide()
 	# Snap back onto the constrained axis so collisions can't push us off-edge,
 	# but the along-edge position (collision-resolved) is preserved.

@@ -23,7 +23,7 @@ func _physics_process(_delta: float) -> void:
 
 	# Move along move_direction (always horizontal for player) with physics velocity
 	# so the CharacterBody2D velocity is correct for deflection response.
-	velocity = move_direction * input_dir * move_speed
+	velocity = move_direction * input_dir * move_speed * arena_scale
 	move_and_slide()
 
 	# Snap back onto the constrained axis (move_and_slide can drift).
@@ -53,31 +53,34 @@ func _get_input_direction() -> float:
 
 
 func _apply_gravity() -> void:
-	var range_sq: float = GRAVITY_RANGE * GRAVITY_RANGE
+	var g_range: float = GRAVITY_RANGE * arena_scale
+	var range_sq: float = g_range * g_range
 	for ball in get_tree().get_nodes_in_group("balls"):
 		var offset: Vector2 = global_position - ball.global_position
 		if offset.length_squared() <= range_sq:
-			ball.apply_central_force(offset.normalized() * GRAVITY_FORCE)
+			ball.apply_central_force(offset.normalized() * GRAVITY_FORCE * arena_scale)
 
 
 func _apply_antigravity() -> void:
 	## Repels all balls within range away from the paddle.
-	var range_sq: float = GRAVITY_RANGE * GRAVITY_RANGE
+	var g_range: float = GRAVITY_RANGE * arena_scale
+	var range_sq: float = g_range * g_range
 	for ball in get_tree().get_nodes_in_group("balls"):
 		var offset: Vector2 = global_position - ball.global_position
 		if offset.length_squared() <= range_sq:
-			ball.apply_central_force(-offset.normalized() * GRAVITY_FORCE)
+			ball.apply_central_force(-offset.normalized() * GRAVITY_FORCE * arena_scale)
 
 
 func _apply_cyclone() -> void:
 	## Spins all balls in range tangentially around the paddle position.
-	var range_sq: float = GRAVITY_RANGE * GRAVITY_RANGE
+	var g_range: float = GRAVITY_RANGE * arena_scale
+	var range_sq: float = g_range * g_range
 	for ball in get_tree().get_nodes_in_group("balls"):
 		var offset: Vector2 = ball.global_position - global_position
 		if offset.length_squared() <= range_sq and offset.length_squared() > 0.0:
 			# Perpendicular to the offset vector (clockwise spin)
 			var tangent: Vector2 = Vector2(-offset.y, offset.x).normalized()
-			ball.apply_central_force(tangent * GRAVITY_FORCE * 1.5)
+			ball.apply_central_force(tangent * GRAVITY_FORCE * arena_scale * 1.5)
 
 
 func _is_slot_key_held(pu_id: String) -> bool:
@@ -92,28 +95,30 @@ func _is_slot_key_held(pu_id: String) -> bool:
 func _draw() -> void:
 	super._draw()
 
+	var g_range: float = GRAVITY_RANGE * arena_scale
+
 	if gravity_active:
 		# Blue-tinted inward pull ring
-		draw_circle(Vector2.ZERO, GRAVITY_RANGE, Color(0.3, 0.6, 1.0, 0.10))
-		draw_arc(Vector2.ZERO, GRAVITY_RANGE, 0, TAU, 48, Color(0.3, 0.6, 1.0, 0.55), 2.0)
+		draw_circle(Vector2.ZERO, g_range, Color(0.3, 0.6, 1.0, 0.10))
+		draw_arc(Vector2.ZERO, g_range, 0, TAU, 48, Color(0.3, 0.6, 1.0, 0.55), 2.0)
 
 	if antigravity_active:
 		# Orange repulsion ring with outward burst lines
-		draw_circle(Vector2.ZERO, GRAVITY_RANGE, Color(1.0, 0.45, 0.1, 0.10))
-		draw_arc(Vector2.ZERO, GRAVITY_RANGE, 0, TAU, 48, Color(1.0, 0.5, 0.15, 0.7), 2.5)
+		draw_circle(Vector2.ZERO, g_range, Color(1.0, 0.45, 0.1, 0.10))
+		draw_arc(Vector2.ZERO, g_range, 0, TAU, 48, Color(1.0, 0.5, 0.15, 0.7), 2.5)
 		for i in 8:
 			var angle: float = i * TAU / 8.0
-			var inner: Vector2 = Vector2.from_angle(angle) * (GRAVITY_RANGE * 0.82)
-			var outer: Vector2 = Vector2.from_angle(angle) * (GRAVITY_RANGE * 1.05)
+			var inner: Vector2 = Vector2.from_angle(angle) * (g_range * 0.82)
+			var outer: Vector2 = Vector2.from_angle(angle) * (g_range * 1.05)
 			draw_line(inner, outer, Color(1.0, 0.5, 0.15, 0.55), 1.5)
 
 	if cyclone_active:
 		# Purple spinning-arc ring
-		draw_circle(Vector2.ZERO, GRAVITY_RANGE, Color(0.65, 0.2, 1.0, 0.10))
-		draw_arc(Vector2.ZERO, GRAVITY_RANGE, 0, TAU, 48, Color(0.7, 0.3, 1.0, 0.7), 2.5)
+		draw_circle(Vector2.ZERO, g_range, Color(0.65, 0.2, 1.0, 0.10))
+		draw_arc(Vector2.ZERO, g_range, 0, TAU, 48, Color(0.7, 0.3, 1.0, 0.7), 2.5)
 		# Spiral arcs to suggest rotation
 		for i in 4:
 			var start_a: float = i * TAU / 4.0
 			var end_a:   float = start_a + TAU * 0.18
-			draw_arc(Vector2.ZERO, GRAVITY_RANGE * 0.6, start_a, end_a, 12, Color(0.75, 0.4, 1.0, 0.5), 2.0)
-			draw_arc(Vector2.ZERO, GRAVITY_RANGE * 0.35, start_a + 0.4, end_a + 0.4, 10, Color(0.75, 0.4, 1.0, 0.35), 1.5)
+			draw_arc(Vector2.ZERO, g_range * 0.6, start_a, end_a, 12, Color(0.75, 0.4, 1.0, 0.5), 2.0)
+			draw_arc(Vector2.ZERO, g_range * 0.35, start_a + 0.4, end_a + 0.4, 10, Color(0.75, 0.4, 1.0, 0.35), 1.5)

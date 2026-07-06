@@ -13,6 +13,9 @@ const ColourData = preload("res://scripts/resources/department_data.gd")
 
 var paddle_color: Color
 var use_deflector: bool = false
+## Set by arena.gd before add_child(). Portrait-mode arena scale — multiply all
+## speed/range/force constants by this so gameplay feel matches landscape.
+var arena_scale: float = 1.0
 
 ## Set by arena.gd before add_child(). Unit vector along the zone edge in world space.
 var move_direction: Vector2 = Vector2(1.0, 0.0)

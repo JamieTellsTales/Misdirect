@@ -526,6 +526,7 @@ func _create_paddle(
 	paddle.rotation        = rotation_rad
 	paddle.paddle_length    = 100.0 * _arena_scale
 	paddle.paddle_thickness = PADDLE_THICKNESS * _arena_scale
+	paddle.arena_scale      = _arena_scale
 
 	add_child(paddle)
 	paddles[ct] = paddle
