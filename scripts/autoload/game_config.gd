@@ -99,6 +99,12 @@ const MODIFIERS: Array = [
 		"unlock_level": 8,
 	},
 	{
+		"id": "return_to_sender",
+		"label": "Return to Sender",
+		"desc": "Wrong catches bounce the ball back into play — faster every time",
+		"unlock_level": 9,
+	},
+	{
 		"id": "speed_ball",
 		"label": "Speed Ball",
 		"desc": "All balls move at double speed — your final score is doubled to compensate",

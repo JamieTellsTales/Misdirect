@@ -57,10 +57,10 @@ Lives are drawn as dots near each score display (`_draw_lives` in arena.gd).
 
 ### Balls
 - Random size 0.5–2.0; smaller = faster, bigger = more points (10–30).
-- Correct catches destroy the ball and score. Wrong catches do NOT destroy it:
-  the zone applies the penalty chain (`apply_wrong_catch_penalty`: speed-up,
-  then blame stamp) and reflects the ball back into the arena (`_bounce_back`
-  in department_zone.gd).
+- Every catch destroys the ball by default. With the **return_to_sender**
+  modifier, wrong catches instead apply the penalty chain
+  (`apply_wrong_catch_penalty`: speed-up, then blame stamp) and reflect the
+  ball back into the arena (`_bounce_back` in department_zone.gd).
 
 ### Maps & Player Counts
 `GameConfig.MAP_VALID_PLAYERS` / `MAP_ZONE_SIDES` define which polygon sides are
@@ -76,8 +76,9 @@ heptagon, octagon. Maps unlock via wins on the previous map
   (railgun, splits, deflector) in `ticket.gd` / `paddle.gd`.
 - **Modifiers** (`GameConfig.MODIFIERS`) are free toggles unlocked by level:
   rotated_colours, chaos_ball, load_balanced, random_directions, extra_time,
-  final_countdown, speed_ball, black_hole, gravity_wells, pillars. Implemented
-  in arena.gd (spawn logic, `_tick_black_hole`, `_tick_gravity_well`, pillars).
+  final_countdown, return_to_sender, speed_ball, black_hole, gravity_wells,
+  pillars. Implemented in arena.gd (spawn logic, `_tick_black_hole`,
+  `_tick_gravity_well`, pillars) and department_zone.gd (return_to_sender).
 
 ---
 

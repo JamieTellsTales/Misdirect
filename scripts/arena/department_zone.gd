@@ -99,10 +99,13 @@ func _handle_ball(ball: Node2D) -> void:
 		score_down.emit(colour_type, points)
 		wrong_catch.emit(ball, colour_type)
 		AudioManager.play_wrong_catch()
-		# Wrong-caught balls are not destroyed — they re-enter play faster each
-		# time (speed-up chain, blame stamp on the third catch).
-		ball.apply_wrong_catch_penalty()
-		_bounce_back(ball)
+		if GameConfig.has_modifier("return_to_sender"):
+			# Wrong-caught balls are not destroyed — they re-enter play faster
+			# each time (speed-up chain, blame stamp on the third catch).
+			ball.apply_wrong_catch_penalty()
+			_bounce_back(ball)
+		else:
+			ball.queue_free()
 
 
 func _bounce_back(ball: Node2D) -> void:
