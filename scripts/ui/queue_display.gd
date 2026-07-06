@@ -30,7 +30,7 @@ func _draw() -> void:
 	draw_rect(rect, department_color.lightened(0.2), false, 2.0)
 
 	# Queue count text
-	var font := ThemeDB.fallback_font
+	var font := FontManager.get_font()
 	var font_size: int = 20
 	var text: String = str(queue_count)
 	var text_size := font.get_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size)

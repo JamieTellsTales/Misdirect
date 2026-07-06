@@ -1,5 +1,7 @@
 extends Node2D
 class_name SettingsScreen
+
+const CornerHUD = preload("res://scripts/ui/corner_hud.gd")
 ## Settings screen — fully drawn via _draw() / _input(), no Control nodes.
 ## Changes are previewed live; only committed to disk on "Save & Back".
 ## Set return_to_game = true before adding as a child overlay so it emits
@@ -9,26 +11,27 @@ signal done  # Emitted in overlay mode after save or discard
 
 var return_to_game: bool = false  # True when used as in-game overlay
 
-const W: float = 1280.0
-const H: float = 720.0
-const CX: float = W / 2.0
+var _W: float = 1280.0
+var _H: float = 720.0
+var _CX: float = 640.0
+var _LABEL_X: float = 220.0
+var _CTRL_X: float = 530.0
 
 # Layout constants
-const LABEL_X: float = 220.0   # Left-align label column
-const CTRL_X: float  = 530.0   # Left edge of control column
 const CTRL_W: float  = 400.0   # Width of sliders / selectors
 const ROW_H: float   = 58.0
 
 # Row Y positions
-const Y_DISPLAY_HDR: float = 148.0
-const Y_RESOLUTION:  float = 192.0
-const Y_FULLSCREEN:  float = 250.0
-const Y_VSYNC:       float = 308.0
-const Y_AUDIO_HDR:   float = 382.0
-const Y_MASTER:      float = 426.0
-const Y_MUSIC:       float = 484.0
-const Y_SFX:         float = 542.0
-const Y_BUTTONS:     float = 618.0
+const Y_DISPLAY_HDR: float = 140.0
+const Y_RESOLUTION:  float = 180.0
+const Y_FULLSCREEN:  float = 234.0
+const Y_VSYNC:       float = 288.0
+const Y_FONT:        float = 342.0
+const Y_AUDIO_HDR:   float = 408.0
+const Y_MASTER:      float = 450.0
+const Y_MUSIC:       float = 504.0
+const Y_SFX:         float = 558.0
+const Y_BUTTONS:     float = 622.0
 
 # Working copies — only written to SettingsManager on save
 var work: Dictionary = {}
@@ -44,6 +47,8 @@ var res_left_rect:   Rect2 = Rect2()
 var res_right_rect:  Rect2 = Rect2()
 var fs_rect:         Rect2 = Rect2()
 var vsync_rect:      Rect2 = Rect2()
+var font_left_rect:  Rect2 = Rect2()
+var font_right_rect: Rect2 = Rect2()
 var save_rect:       Rect2 = Rect2()
 var discard_rect:    Rect2 = Rect2()
 
@@ -65,6 +70,7 @@ func _copy_from_manager() -> void:
 		"fullscreen":       SettingsManager.fullscreen,
 		"vsync":            SettingsManager.vsync,
 		"resolution_index": SettingsManager.resolution_index,
+		"font_mode_index":  SettingsManager.font_mode_index,
 		"master_volume":    SettingsManager.master_volume,
 		"music_volume":     SettingsManager.music_volume,
 		"sfx_volume":       SettingsManager.sfx_volume,
@@ -78,15 +84,19 @@ func _process(_delta: float) -> void:
 # ── Input ────────────────────────────────────────────────────────────────────
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Use canvas-space coordinates — event.position is in window pixels which
+	# does not match the rects computed by _draw() at non-1x viewport scales.
+	var mpos := get_global_mouse_position()
+
 	if event is InputEventMouseMotion:
-		_on_mouse_move(event.position)
+		_on_mouse_move(mpos)
 		if dragging_slider != "":
-			_drag_slider(dragging_slider, event.position.x)
+			_drag_slider(dragging_slider, mpos.x)
 
 	elif event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
-				_on_left_down(event.position)
+				_on_left_down(mpos)
 			else:
 				dragging_slider = ""
 
@@ -96,10 +106,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _on_mouse_move(pos: Vector2) -> void:
 	hover = ""
-	if res_left_rect.has_point(pos):   hover = "res_left"
+	if res_left_rect.has_point(pos):    hover = "res_left"
 	elif res_right_rect.has_point(pos): hover = "res_right"
 	elif fs_rect.has_point(pos):        hover = "fullscreen"
 	elif vsync_rect.has_point(pos):     hover = "vsync"
+	elif font_left_rect.has_point(pos): hover = "font_left"
+	elif font_right_rect.has_point(pos):hover = "font_right"
 	elif save_rect.has_point(pos):      hover = "save"
 	elif discard_rect.has_point(pos):   hover = "discard"
 	else:
@@ -111,16 +123,26 @@ func _on_mouse_move(pos: Vector2) -> void:
 
 func _on_left_down(pos: Vector2) -> void:
 	if res_left_rect.has_point(pos):
-		work["resolution_index"] = wrapi(work["resolution_index"] - 1, 0, SettingsManager.RESOLUTIONS.size())
+		SettingsManager.resolution_index = work["resolution_index"]
+		SettingsManager.step_resolution(-1)
+		work["resolution_index"] = SettingsManager.resolution_index
 		_preview()
 	elif res_right_rect.has_point(pos):
-		work["resolution_index"] = wrapi(work["resolution_index"] + 1, 0, SettingsManager.RESOLUTIONS.size())
+		SettingsManager.resolution_index = work["resolution_index"]
+		SettingsManager.step_resolution(1)
+		work["resolution_index"] = SettingsManager.resolution_index
 		_preview()
 	elif fs_rect.has_point(pos):
 		work["fullscreen"] = not work["fullscreen"]
 		_preview()
 	elif vsync_rect.has_point(pos):
 		work["vsync"] = not work["vsync"]
+		_preview()
+	elif font_left_rect.has_point(pos):
+		work["font_mode_index"] = wrapi(work["font_mode_index"] - 1, 0, SettingsManager.FONT_MODES.size())
+		_preview()
+	elif font_right_rect.has_point(pos):
+		work["font_mode_index"] = wrapi(work["font_mode_index"] + 1, 0, SettingsManager.FONT_MODES.size())
 		_preview()
 	elif save_rect.has_point(pos):
 		_save()
@@ -150,6 +172,7 @@ func _preview() -> void:
 	SettingsManager.fullscreen       = work["fullscreen"]
 	SettingsManager.vsync            = work["vsync"]
 	SettingsManager.resolution_index = work["resolution_index"]
+	SettingsManager.font_mode_index  = work["font_mode_index"]
 	SettingsManager.master_volume    = work["master_volume"]
 	SettingsManager.music_volume     = work["music_volume"]
 	SettingsManager.sfx_volume       = work["sfx_volume"]
@@ -180,17 +203,23 @@ func _discard() -> void:
 # ── Drawing ──────────────────────────────────────────────────────────────────
 
 func _draw() -> void:
+	_W = get_viewport_rect().size.x
+	_H = get_viewport_rect().size.y
+	_CX = _W / 2.0
+	_LABEL_X = _CX - 420.0
+	_CTRL_X  = _CX - 110.0
 	_draw_bg()
 	_draw_header()
 	_draw_display_section()
 	_draw_audio_section()
 	_draw_buttons()
+	CornerHUD.draw_on(self)
 
 
 func _draw_bg() -> void:
-	draw_rect(Rect2(Vector2.ZERO, Vector2(W, H)), Color(0.07, 0.07, 0.12, 1.0))
+	draw_rect(Rect2(Vector2.ZERO, Vector2(_W, _H)), Color(0.07, 0.07, 0.12, 1.0))
 
-	var cx: float = CX; var cy: float = H / 2.0
+	var cx: float = _CX; var cy: float = _H / 2.0
 	var half: float = 380.0; var inset: float = 130.0
 	var pts: PackedVector2Array = [
 		Vector2(cx - half, cy - inset), Vector2(cx - inset, cy - half),
@@ -203,34 +232,34 @@ func _draw_bg() -> void:
 
 	var ca: float = 0.07
 	draw_circle(Vector2(0, 0),   200, Color(Color.DODGER_BLUE,   ca))
-	draw_circle(Vector2(W, 0),   200, Color(Color.CRIMSON,       ca))
-	draw_circle(Vector2(0, H),   200, Color(Color.FOREST_GREEN,  ca))
-	draw_circle(Vector2(W, H),   200, Color(Color.GOLD,          ca))
+	draw_circle(Vector2(_W, 0),   200, Color(Color.CRIMSON,       ca))
+	draw_circle(Vector2(0, _H),   200, Color(Color.FOREST_GREEN,  ca))
+	draw_circle(Vector2(_W, _H),   200, Color(Color.GOLD,          ca))
 
 
 func _draw_header() -> void:
-	var font := ThemeDB.fallback_font
+	var font := FontManager.get_font()
 
 	var title := "MISDIRECT"
 	var tsz: int = 48
 	var tw := font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, tsz).x
-	draw_string(font, Vector2(CX - tw / 2.0 + 2, 72), title,
+	draw_string(font, Vector2(_CX - tw / 2.0 + 2, 72), title,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, tsz, Color(0, 0, 0, 0.5))
-	draw_string(font, Vector2(CX - tw / 2.0, 70), title,
+	draw_string(font, Vector2(_CX - tw / 2.0, 70), title,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, tsz, Color.WHITE)
 
 	var sub := "Settings"
 	var ssz: int = 22
 	var sw := font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, ssz).x
-	draw_string(font, Vector2(CX - sw / 2.0, 102), sub,
+	draw_string(font, Vector2(_CX - sw / 2.0, 102), sub,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, ssz, Color(0.45, 0.45, 0.58, 1.0))
 
-	draw_line(Vector2(LABEL_X, 118), Vector2(W - LABEL_X, 118),
+	draw_line(Vector2(_LABEL_X, 118), Vector2(_W - _LABEL_X, 118),
 		Color(0.3, 0.3, 0.4, 0.5), 1.0)
 
 
 func _draw_display_section() -> void:
-	var font := ThemeDB.fallback_font
+	var font := FontManager.get_font()
 
 	_draw_section_label(font, "DISPLAY", Y_DISPLAY_HDR)
 
@@ -247,12 +276,16 @@ func _draw_display_section() -> void:
 	_draw_row_label(font, "VSync", Y_VSYNC)
 	_draw_toggle(font, "vsync", work["vsync"], Y_VSYNC)
 
-	draw_line(Vector2(LABEL_X, Y_AUDIO_HDR - 18), Vector2(W - LABEL_X, Y_AUDIO_HDR - 18),
+	# Font / accessibility
+	_draw_row_label(font, "Font", Y_FONT)
+	_draw_font_selector(font, Y_FONT)
+
+	draw_line(Vector2(_LABEL_X, Y_AUDIO_HDR - 18), Vector2(_W - _LABEL_X, Y_AUDIO_HDR - 18),
 		Color(0.25, 0.25, 0.35, 0.4), 1.0)
 
 
 func _draw_audio_section() -> void:
-	var font := ThemeDB.fallback_font
+	var font := FontManager.get_font()
 
 	_draw_section_label(font, "AUDIO", Y_AUDIO_HDR)
 
@@ -267,11 +300,11 @@ func _draw_audio_section() -> void:
 
 
 func _draw_buttons() -> void:
-	var font := ThemeDB.fallback_font
+	var font := FontManager.get_font()
 
 	# Save & Back
 	var sw: float = 220.0; var sh: float = 50.0
-	save_rect = Rect2(CX - sw - 16.0, Y_BUTTONS, sw, sh)
+	save_rect = Rect2(_CX - sw - 16.0, Y_BUTTONS, sw, sh)
 	var save_hov: bool = hover == "save"
 	draw_rect(save_rect, Color(0.1, 0.45, 0.15, 1.0) if save_hov else Color(0.08, 0.32, 0.1, 1.0))
 	draw_rect(save_rect, Color(0.3, 0.9, 0.4, 0.9) if save_hov else Color(0.2, 0.65, 0.25, 0.7), false, 2.0)
@@ -282,7 +315,7 @@ func _draw_buttons() -> void:
 
 	# Discard
 	var dw: float = 180.0
-	discard_rect = Rect2(CX + 16.0, Y_BUTTONS, dw, sh)
+	discard_rect = Rect2(_CX + 16.0, Y_BUTTONS, dw, sh)
 	var dis_hov: bool = hover == "discard"
 	draw_rect(discard_rect, Color(0.28, 0.28, 0.38, 1.0) if dis_hov else Color(0.18, 0.18, 0.26, 1.0))
 	draw_rect(discard_rect, Color(0.5, 0.5, 0.65, 0.7) if dis_hov else Color(0.35, 0.35, 0.48, 0.5), false, 2.0)
@@ -295,20 +328,20 @@ func _draw_buttons() -> void:
 	var hint := "ESC — discard & back"
 	var hsz: int = 13
 	var hw := font.get_string_size(hint, HORIZONTAL_ALIGNMENT_LEFT, -1, hsz).x
-	draw_string(font, Vector2(CX - hw / 2.0, H - 20.0),
+	draw_string(font, Vector2(_CX - hw / 2.0, _H - 20.0),
 		hint, HORIZONTAL_ALIGNMENT_LEFT, -1, hsz, Color(0.3, 0.3, 0.4, 1.0))
 
 
 # ── Row helpers ──────────────────────────────────────────────────────────────
 
 func _draw_section_label(font: Font, text: String, y: float) -> void:
-	draw_string(font, Vector2(LABEL_X, y), text,
+	draw_string(font, Vector2(_LABEL_X, y), text,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.75, 0.75, 0.88, 1.0))
 
 
 func _draw_row_label(font: Font, text: String, y: float, dimmed: bool = false) -> void:
 	var col := Color(0.4, 0.4, 0.5, 1.0) if dimmed else Color(0.7, 0.7, 0.82, 1.0)
-	draw_string(font, Vector2(LABEL_X + 18.0, y + 6.0), text,
+	draw_string(font, Vector2(_LABEL_X + 18.0, y + 6.0), text,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, col)
 
 
@@ -320,29 +353,29 @@ func _draw_resolution_selector(font: Font, y: float, dimmed: bool) -> void:
 	var arrow_pad: float = 10.0
 
 	# Left arrow
-	res_left_rect = Rect2(CTRL_X, y - 4.0, arrow_sz, 36.0)
+	res_left_rect = Rect2(_CTRL_X, y - 4.0, arrow_sz, 36.0)
 	var lhov: bool = hover == "res_left" and not dimmed
 	var arrow_col := Color(0.3, 0.3, 0.4, 1.0) if dimmed else (Color(0.9, 0.9, 1.0, 1.0) if lhov else Color(0.55, 0.55, 0.7, 1.0))
-	draw_string(font, Vector2(CTRL_X + 4.0, y + 22.0), "◀",
+	draw_string(font, Vector2(_CTRL_X + 4.0, y + 22.0), "◀",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, arrow_col)
 
 	# Label
 	var lw := font.get_string_size(res_str, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x
-	var lx: float = CTRL_X + arrow_sz + arrow_pad + (CTRL_W - arrow_sz * 2 - arrow_pad * 2 - lw) / 2.0
+	var lx: float = _CTRL_X + arrow_sz + arrow_pad + (CTRL_W - arrow_sz * 2 - arrow_pad * 2 - lw) / 2.0
 	var text_col := Color(0.35, 0.35, 0.45, 1.0) if dimmed else Color(0.9, 0.9, 1.0, 1.0)
 	draw_string(font, Vector2(lx, y + 22.0), res_str,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, text_col)
 
 	# Right arrow
-	res_right_rect = Rect2(CTRL_X + CTRL_W - arrow_sz, y - 4.0, arrow_sz, 36.0)
+	res_right_rect = Rect2(_CTRL_X + CTRL_W - arrow_sz, y - 4.0, arrow_sz, 36.0)
 	var rhov: bool = hover == "res_right" and not dimmed
 	var rarrow_col := Color(0.3, 0.3, 0.4, 1.0) if dimmed else (Color(0.9, 0.9, 1.0, 1.0) if rhov else Color(0.55, 0.55, 0.7, 1.0))
-	draw_string(font, Vector2(CTRL_X + CTRL_W - arrow_sz + 4.0, y + 22.0), "▶",
+	draw_string(font, Vector2(_CTRL_X + CTRL_W - arrow_sz + 4.0, y + 22.0), "▶",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, rarrow_col)
 
 	if dimmed:
 		var note_sz: int = 13
-		draw_string(font, Vector2(CTRL_X + CTRL_W + 16.0, y + 18.0), "(fullscreen)",
+		draw_string(font, Vector2(_CTRL_X + CTRL_W + 16.0, y + 18.0), "(fullscreen)",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, note_sz, Color(0.4, 0.4, 0.5, 1.0))
 
 
@@ -350,7 +383,7 @@ func _draw_toggle(font: Font, id: String, value: bool, y: float) -> void:
 	var hov: bool = hover == id
 	var total_w: float = 130.0
 	var h: float = 32.0
-	var rx: float = CTRL_X
+	var rx: float = _CTRL_X
 	var ry: float = y - 2.0
 
 	# Background track
@@ -382,13 +415,41 @@ func _draw_toggle(font: Font, id: String, value: bool, y: float) -> void:
 		vsync_rect = Rect2(rx, ry, total_w, h)
 
 
+func _draw_font_selector(font: Font, y: float) -> void:
+	var mode_label: String = SettingsManager.FONT_MODES[work["font_mode_index"]]["label"]
+
+	var arrow_sz: float  = 28.0
+	var arrow_pad: float = 10.0
+
+	# Left arrow
+	font_left_rect = Rect2(_CTRL_X, y - 4.0, arrow_sz, 36.0)
+	var lhov: bool   = hover == "font_left"
+	var larrow_col   := Color(0.9, 0.9, 1.0, 1.0) if lhov else Color(0.55, 0.55, 0.7, 1.0)
+	draw_string(font, Vector2(_CTRL_X + 4.0, y + 22.0), "◀",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, larrow_col)
+
+	# Label — shown in the selected font so players preview the change immediately
+	var label_font: Font = FontManager.get_font()
+	var lw := label_font.get_string_size(mode_label, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
+	var lx: float = _CTRL_X + arrow_sz + arrow_pad + (CTRL_W - arrow_sz * 2 - arrow_pad * 2 - lw) / 2.0
+	draw_string(label_font, Vector2(lx, y + 22.0), mode_label,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.9, 0.9, 1.0, 1.0))
+
+	# Right arrow
+	font_right_rect = Rect2(_CTRL_X + CTRL_W - arrow_sz, y - 4.0, arrow_sz, 36.0)
+	var rhov: bool   = hover == "font_right"
+	var rarrow_col   := Color(0.9, 0.9, 1.0, 1.0) if rhov else Color(0.55, 0.55, 0.7, 1.0)
+	draw_string(font, Vector2(_CTRL_X + CTRL_W - arrow_sz + 4.0, y + 22.0), "▶",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, rarrow_col)
+
+
 func _draw_slider(font: Font, name: String, value: float, y: float) -> void:
 	var track_h: float = 8.0
 	var thumb_r: float = 10.0
 	var ty: float = y + 14.0  # Track centre Y
 
-	var track_rect := Rect2(CTRL_X, ty - track_h / 2.0, CTRL_W, track_h)
-	sliders[name] = Rect2(CTRL_X - thumb_r, ty - 20.0, CTRL_W + thumb_r * 2, 40.0)  # Generous hit area
+	var track_rect := Rect2(_CTRL_X, ty - track_h / 2.0, CTRL_W, track_h)
+	sliders[name] = Rect2(_CTRL_X - thumb_r, ty - 20.0, CTRL_W + thumb_r * 2, 40.0)  # Generous hit area
 
 	var is_hov: bool = hover == "slider_" + name or dragging_slider == name
 
@@ -398,14 +459,14 @@ func _draw_slider(font: Font, name: String, value: float, y: float) -> void:
 	# Filled portion
 	var filled_w: float = CTRL_W * value
 	if filled_w > 0:
-		draw_rect(Rect2(CTRL_X, ty - track_h / 2.0, filled_w, track_h),
+		draw_rect(Rect2(_CTRL_X, ty - track_h / 2.0, filled_w, track_h),
 			Color(0.25, 0.7, 0.35, 1.0))
 
 	# Track border
 	draw_rect(track_rect, Color(0.35, 0.35, 0.48, 0.6), false, 1.5)
 
 	# Thumb
-	var tx: float = CTRL_X + CTRL_W * value
+	var tx: float = _CTRL_X + CTRL_W * value
 	var thumb_col := Color(0.4, 0.95, 0.5, 1.0) if is_hov else Color(0.3, 0.8, 0.4, 1.0)
 	draw_circle(Vector2(tx, ty), thumb_r, thumb_col)
 	draw_arc(Vector2(tx, ty), thumb_r, 0, TAU, 24, Color(0.2, 0.5, 0.25, 1.0), 2.0)
@@ -413,5 +474,5 @@ func _draw_slider(font: Font, name: String, value: float, y: float) -> void:
 	# Percentage label
 	var pct_str: String = "%d%%" % roundi(value * 100.0)
 	var psz: int = 16
-	draw_string(font, Vector2(CTRL_X + CTRL_W + 18.0, y + 20.0), pct_str,
+	draw_string(font, Vector2(_CTRL_X + CTRL_W + 18.0, y + 20.0), pct_str,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, psz, Color(0.6, 0.6, 0.72, 1.0))

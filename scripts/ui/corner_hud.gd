@@ -10,7 +10,7 @@ const BAR_GAP:  float = 4.0    # gap between stats text and bar
 
 
 static func draw_on(ci: CanvasItem) -> void:
-	var font := ThemeDB.fallback_font
+	var font := FontManager.get_font()
 
 	var profile_name: String = ProfileManager.active_name()
 	var level: int           = StatsManager.get_level()

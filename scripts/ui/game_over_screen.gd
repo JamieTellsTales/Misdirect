@@ -12,6 +12,9 @@ var final_scores: Dictionary = {}
 var winner_colour: int = -1
 var player_colour: int = -1
 var player_collapsed: bool = false
+var player_eliminated: bool = false  # True when player lost all lives (endless/elimination)
+var is_draw: bool = false
+var top_score: int = -1
 var tokens_earned: int = 0
 var is_new_high_score: bool = false
 var xp_earned: int = 0
@@ -78,10 +81,12 @@ func show_results(
 		xp_gained: int = 0,
 		lv_before: int = 0,
 		lv_after: int = 0,
+		eliminated: bool = false,
 ) -> void:
 	final_scores      = scores
 	player_colour     = player_ct
 	player_collapsed  = player_ct in collapsed_colours
+	player_eliminated = eliminated
 	tokens_earned     = earned
 	is_new_high_score = new_high
 	xp_earned         = xp_gained
@@ -96,9 +101,24 @@ func show_results(
 				best_score = scores[ct]
 				winner_colour = ct
 
+	# Count how many non-collapsed players share the top score.
+	top_score = best_score
+	var top_scorers: int = 0
+	for ct in scores.keys():
+		if ct not in collapsed_colours and scores[ct] == best_score:
+			top_scorers += 1
+	is_draw = top_scorers > 1
+	if is_draw:
+		winner_colour = -1  # No single winner in a draw
+
 	visible = true
 	queue_redraw()
-	if not player_collapsed and winner_colour == player_colour:
+	var player_in_top: bool = (not player_collapsed) and (scores.get(player_ct, -1) == best_score)
+	if player_eliminated or player_collapsed:
+		AudioManager.play_defeat()
+	elif not is_draw and winner_colour == player_colour:
+		AudioManager.play_victory()
+	elif player_in_top and is_draw:
 		AudioManager.play_victory()
 	else:
 		AudioManager.play_defeat()
@@ -122,13 +142,13 @@ func _draw() -> void:
 	if not visible:
 		return
 
-	var screen_size := Vector2(1280.0, 720.0)
+	var screen_size := get_viewport_rect().size
 	var center_x: float = screen_size.x / 2.0
 	var center_y: float = screen_size.y / 2.0
 
-	draw_rect(Rect2(Vector2.ZERO, Vector2(1280.0, 720.0)), Color(0, 0, 0, 0.5))
+	draw_rect(Rect2(Vector2.ZERO, screen_size), Color(0, 0, 0, 0.5))
 
-	var font := ThemeDB.fallback_font
+	var font := FontManager.get_font()
 
 	# Box width: just wide enough for the instructions line + 24 px padding each side.
 	var inst_size: int = 15
@@ -164,14 +184,17 @@ func _draw() -> void:
 
 	var title: String
 	var title_color: Color
-	if player_collapsed:
-		title = "ZONE COLLAPSED!"
+	if player_eliminated or player_collapsed:
+		title = "GAME OVER"
 		title_color = Color.TOMATO
+	elif is_draw:
+		title = "IT'S A DRAW!"
+		title_color = Color(0.5, 0.85, 1.0, 1.0)
 	elif winner_colour == player_colour:
 		title = "YOU WIN!"
 		title_color = Color.GOLD
 	else:
-		title = "GAME OVER"
+		title = "YOU LOSE"
 		title_color = Color.WHITE
 
 	var title_size: int = 36
@@ -193,12 +216,10 @@ func _draw() -> void:
 		var ct_color: Color = ColourData.get_color(ct)
 		var score_val: int = final_scores[ct]
 
-		# Left: colour name with markers
-		var label: String = ColourData.get_colour_name(ct)
-		if ct == winner_colour:
+		# Left: colour name (player shows their profile name) with markers
+		var label: String = ProfileManager.active_name() if ct == player_colour else ColourData.get_colour_name(ct)
+		if (not is_draw and ct == winner_colour) or (is_draw and final_scores[ct] == top_score):
 			label += "  ★"
-		if ct == player_colour:
-			label += "  (You)"
 		draw_string(font, Vector2(label_x, y_pos),
 			label, HORIZONTAL_ALIGNMENT_LEFT, -1, score_size, ct_color)
 

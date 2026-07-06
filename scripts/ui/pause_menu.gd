@@ -4,9 +4,6 @@ class_name PauseMenu
 ## Drawn via _draw() consistent with the rest of the UI codebase.
 ## process_mode = ALWAYS so navigation still works while the tree is paused.
 
-const ARENA_WIDTH:  float = 1280.0
-const ARENA_HEIGHT: float = 720.0
-
 const ITEMS: Array = ["CONTINUE", "SETTINGS", "ACHIEVEMENTS", "EXIT"]
 const ITEM_COLORS: Array = [
 	Color.FOREST_GREEN,
@@ -66,11 +63,16 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not is_open or not is_inside_tree():
 		return
 
+	# Use canvas-space mouse position so hit-testing works at any viewport scale
+	# and regardless of whether the panel is centred on the design area or the
+	# full expanded canvas.
+	var mouse_pos := get_global_mouse_position()
+
 	if event is InputEventMouseMotion:
-		_update_hover(event.position)
+		_update_hover(mouse_pos)
 
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_handle_click(event.position)
+		_handle_click(mouse_pos)
 		get_viewport().set_input_as_handled()
 		return
 
@@ -135,15 +137,28 @@ func _activate(index: int) -> void:
 
 # ── Drawing ───────────────────────────────────────────────────────────────────
 
+func _get_panel_centre() -> Vector2:
+	## Returns the canvas-space centre that the panel should be drawn around.
+	## In portrait mode the arena is pinned to the top, so we ask the arena for
+	## its design centre rather than using the full viewport centre.
+	var parent = get_parent()
+	if parent and parent.has_method("get_design_centre"):
+		return parent.get_design_centre()
+	return get_viewport_rect().size / 2.0
+
+
 func _draw() -> void:
 	if not is_open:
 		return
 
-	var cx: float = ARENA_WIDTH  / 2.0
-	var cy: float = ARENA_HEIGHT / 2.0
+	var sw: float = get_viewport_rect().size.x
+	var sh: float = get_viewport_rect().size.y
+	var panel_centre: Vector2 = _get_panel_centre()
+	var cx: float = panel_centre.x
+	var cy: float = panel_centre.y
 
-	# Full-screen dim
-	draw_rect(Rect2(Vector2.ZERO, Vector2(ARENA_WIDTH, ARENA_HEIGHT)), Color(0, 0, 0, 0.65))
+	# Full-screen dim (covers entire expanded viewport)
+	draw_rect(Rect2(Vector2.ZERO, Vector2(sw, sh)), Color(0, 0, 0, 0.65))
 
 	# Panel
 	var box_w: float = 380.0
@@ -153,7 +168,7 @@ func _draw() -> void:
 	draw_rect(Rect2(bx, by, box_w, box_h), Color(0.07, 0.07, 0.12, 0.97))
 	draw_rect(Rect2(bx, by, box_w, box_h), Color(0.55, 0.55, 0.65, 1.0), false, 2.0)
 
-	var font := ThemeDB.fallback_font
+	var font := FontManager.get_font()
 
 	# Title
 	var title      := "PAUSED"

@@ -28,6 +28,9 @@ var wrong_catch_count: int = 0
 var has_blame_stamp: bool = false
 var speed_multiplier: float = 1.0
 
+## Set by arena.gd before add_child() so sizes and speeds scale with the arena.
+var arena_scale: float = 1.0
+
 # Split control — split children cannot re-split
 var can_split: bool = true
 
@@ -51,12 +54,12 @@ func set_random_size() -> void:
 
 
 func _apply_size() -> void:
-	radius = 16.0 * size_scale
+	radius = 16.0 * size_scale * arena_scale
 
 	var speed_factor: float = 1.0 / size_scale
-	max_speed = 500.0 * speed_factor
-	min_speed = 150.0 * speed_factor
-	base_speed = 300.0 * speed_factor
+	max_speed  = 500.0 * speed_factor * arena_scale
+	min_speed  = 150.0 * speed_factor * arena_scale
+	base_speed = 300.0 * speed_factor * arena_scale
 
 	point_value = int(10 + (size_scale - 0.5) * 20)
 
@@ -115,17 +118,17 @@ func _on_body_entered(body: Node) -> void:
 
 
 func _draw() -> void:
-	draw_circle(Vector2.ZERO, radius, ball_color)
+	draw_circle(Vector2.ZERO, radius, ball_color, true, -1.0, true)
 
 	var border_width: float = 2.0 + size_scale
-	draw_arc(Vector2.ZERO, radius, 0, TAU, 32, ball_color.lightened(0.3), border_width)
+	draw_arc(Vector2.ZERO, radius, 0, TAU, 64, ball_color.lightened(0.3), border_width, true)
 
 	if has_blame_stamp:
 		var stamp_color := Color.BLACK
 		stamp_color.a = 0.7
 		var stamp_size: float = radius * 0.5
-		draw_line(Vector2(-stamp_size, -stamp_size), Vector2(stamp_size, stamp_size), stamp_color, 3.0)
-		draw_line(Vector2(stamp_size, -stamp_size), Vector2(-stamp_size, stamp_size), stamp_color, 3.0)
+		draw_line(Vector2(-stamp_size, -stamp_size), Vector2(stamp_size, stamp_size), stamp_color, 3.0, true)
+		draw_line(Vector2(stamp_size, -stamp_size), Vector2(-stamp_size, stamp_size), stamp_color, 3.0, true)
 
 
 func set_ball_color(color: Color) -> void:

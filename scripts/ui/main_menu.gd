@@ -4,9 +4,6 @@ class_name MainMenu
 
 const CornerHUD = preload("res://scripts/ui/corner_hud.gd")
 
-const ARENA_WIDTH: float = 1280.0
-const ARENA_HEIGHT: float = 720.0
-
 const MENU_ITEMS: Array = ["PLAY", "SETTINGS", "STATS", "UNLOCKS", "ACHIEVEMENTS", "EXIT"]
 const MENU_COLORS: Array = [
 	Color.FOREST_GREEN,
@@ -90,7 +87,7 @@ func _activate(index: int) -> void:
 	match index:
 		0:
 			GameConfig.reset()
-			get_tree().change_scene_to_file("res://scenes/map_select.tscn")
+			get_tree().change_scene_to_file("res://scenes/mode_select.tscn")
 		1:
 			get_tree().change_scene_to_file("res://scenes/settings_screen.tscn")
 		2:
@@ -114,11 +111,13 @@ func _draw() -> void:
 
 
 func _draw_background() -> void:
-	draw_rect(Rect2(Vector2.ZERO, Vector2(ARENA_WIDTH, ARENA_HEIGHT)), Color(0.07, 0.07, 0.12, 1.0))
+	var sw: float = get_viewport_rect().size.x
+	var sh: float = get_viewport_rect().size.y
+	draw_rect(Rect2(Vector2.ZERO, Vector2(sw, sh)), Color(0.07, 0.07, 0.12, 1.0))
 
 	# Faint arena-style octagon as background decoration
-	var cx: float = ARENA_WIDTH / 2.0
-	var cy: float = ARENA_HEIGHT / 2.0
+	var cx: float = sw / 2.0
+	var cy: float = sh / 2.0
 	var half: float = 300.0
 	var inset: float = 100.0
 	var dec_points: PackedVector2Array = [
@@ -138,14 +137,14 @@ func _draw_background() -> void:
 	# Subtle coloured corner accents matching department colours
 	var corner_alpha: float = 0.12
 	draw_circle(Vector2(0, 0), 200, Color(Color.DODGER_BLUE, corner_alpha))
-	draw_circle(Vector2(ARENA_WIDTH, 0), 200, Color(Color.CRIMSON, corner_alpha))
-	draw_circle(Vector2(0, ARENA_HEIGHT), 200, Color(Color.FOREST_GREEN, corner_alpha))
-	draw_circle(Vector2(ARENA_WIDTH, ARENA_HEIGHT), 200, Color(Color.GOLD, corner_alpha))
+	draw_circle(Vector2(sw, 0), 200, Color(Color.CRIMSON, corner_alpha))
+	draw_circle(Vector2(0, sh), 200, Color(Color.FOREST_GREEN, corner_alpha))
+	draw_circle(Vector2(sw, sh), 200, Color(Color.GOLD, corner_alpha))
 
 
 func _draw_title() -> void:
-	var font := ThemeDB.fallback_font
-	var cx: float = ARENA_WIDTH / 2.0
+	var font := FontManager.get_font()
+	var cx: float = get_viewport_rect().size.x / 2.0
 
 	var title := "MISDIRECT"
 	var title_size: int = 72
@@ -161,8 +160,10 @@ func _draw_title() -> void:
 
 
 func _draw_menu() -> void:
-	var font := ThemeDB.fallback_font
-	var cx: float = ARENA_WIDTH / 2.0
+	var font := FontManager.get_font()
+	var sw: float = get_viewport_rect().size.x
+	var sh: float = get_viewport_rect().size.y
+	var cx: float = sw / 2.0
 	var item_font_size: int = 36
 	var spacing: float = 68.0
 	var start_y: float = 240.0
@@ -197,14 +198,14 @@ func _draw_menu() -> void:
 	var hint := "↑ ↓  navigate     Enter / click  select"
 	var hint_size: int = 14
 	var hint_w := font.get_string_size(hint, HORIZONTAL_ALIGNMENT_LEFT, -1, hint_size).x
-	draw_string(font, Vector2(cx - hint_w / 2.0, ARENA_HEIGHT - 36.0),
+	draw_string(font, Vector2(cx - hint_w / 2.0, sh - 36.0),
 		hint, HORIZONTAL_ALIGNMENT_LEFT, -1, hint_size, Color(0.3, 0.3, 0.38, 1.0))
 
 
 func _draw_profile_badge() -> void:
 	## Draws a small player badge in the bottom-left corner.
 	## Clicking it navigates to the profile selection screen.
-	var font := ThemeDB.fallback_font
+	var font := FontManager.get_font()
 	var name_str: String = ProfileManager.active_name()
 	var label: String = "  " + name_str + "  ▾"
 	var lsz: int = 15
@@ -213,7 +214,7 @@ func _draw_profile_badge() -> void:
 	var badge_w: float = lw + pad_x * 2.0
 	var badge_h: float = 32.0
 	var badge_x: float = 28.0
-	var badge_y: float = ARENA_HEIGHT - 52.0
+	var badge_y: float = get_viewport_rect().size.y - 52.0
 	_badge_rect = Rect2(badge_x, badge_y, badge_w, badge_h)
 
 	var bg: Color = Color(0.22, 0.22, 0.32, 1.0) if _badge_hovered else Color(0.13, 0.13, 0.2, 1.0)
@@ -226,19 +227,21 @@ func _draw_profile_badge() -> void:
 
 
 func _draw_popup() -> void:
+	var sw: float = get_viewport_rect().size.x
+	var sh: float = get_viewport_rect().size.y
 	# Dim
-	draw_rect(Rect2(Vector2.ZERO, Vector2(ARENA_WIDTH, ARENA_HEIGHT)), Color(0, 0, 0, 0.6))
+	draw_rect(Rect2(Vector2.ZERO, Vector2(sw, sh)), Color(0, 0, 0, 0.6))
 
 	# Panel
 	var box_w: float = 400.0
 	var box_h: float = 170.0
-	var bx: float = ARENA_WIDTH / 2.0 - box_w / 2.0
-	var by: float = ARENA_HEIGHT / 2.0 - box_h / 2.0
+	var bx: float = sw / 2.0 - box_w / 2.0
+	var by: float = sh / 2.0 - box_h / 2.0
 	draw_rect(Rect2(bx, by, box_w, box_h), Color(0.07, 0.07, 0.12, 0.97))
 	draw_rect(Rect2(bx, by, box_w, box_h), Color(0.5, 0.5, 0.62, 1.0), false, 2.0)
 
-	var font := ThemeDB.fallback_font
-	var cx: float = ARENA_WIDTH / 2.0
+	var font := FontManager.get_font()
+	var cx: float = sw / 2.0
 
 	var heading: String = MENU_ITEMS[popup_state]
 	var h_size: int = 30

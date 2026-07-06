@@ -12,6 +12,7 @@ const ColourData = preload("res://scripts/resources/department_data.gd")
 @export var paddle_thickness: float = 12.0
 
 var paddle_color: Color
+var use_deflector: bool = false
 
 ## Set by arena.gd before add_child(). Unit vector along the zone edge in world space.
 var move_direction: Vector2 = Vector2(1.0, 0.0)
@@ -38,16 +39,36 @@ func _ready() -> void:
 func _setup_collision_shape() -> void:
 	## Collision shape is always paddle_length × paddle_thickness in local space.
 	## The node's rotation aligns it with its zone edge.
-	var shape := RectangleShape2D.new()
-	shape.size = Vector2(paddle_length, paddle_thickness)
-	$CollisionShape2D.shape = shape
+	if use_deflector:
+		var shape := ConvexPolygonShape2D.new()
+		shape.points = PackedVector2Array([
+			Vector2(-paddle_length / 2.0,  paddle_thickness / 2.0),
+			Vector2( paddle_length / 2.0,  paddle_thickness / 2.0),
+			Vector2(0.0,                  -paddle_thickness),
+		])
+		$CollisionShape2D.shape = shape
+	else:
+		var shape := RectangleShape2D.new()
+		shape.size = Vector2(paddle_length, paddle_thickness)
+		$CollisionShape2D.shape = shape
 
 
 func _draw() -> void:
-	var size := Vector2(paddle_length, paddle_thickness)
-	var rect := Rect2(-size / 2.0, size)
-	draw_rect(rect, paddle_color)
-	draw_rect(rect, paddle_color.lightened(0.3), false, 2.0)
+	if use_deflector:
+		var tri := PackedVector2Array([
+			Vector2(-paddle_length / 2.0,  paddle_thickness / 2.0),
+			Vector2( paddle_length / 2.0,  paddle_thickness / 2.0),
+			Vector2(0.0,                  -paddle_thickness),
+		])
+		draw_colored_polygon(tri, paddle_color)
+		var border := PackedVector2Array(tri)
+		border.append(border[0])
+		draw_polyline(border, paddle_color.lightened(0.3), 2.0)
+	else:
+		var size := Vector2(paddle_length, paddle_thickness)
+		var rect := Rect2(-size / 2.0, size)
+		draw_rect(rect, paddle_color)
+		draw_rect(rect, paddle_color.lightened(0.3), false, 2.0)
 
 
 ## Returns the current signed offset from zone_centre along move_direction.

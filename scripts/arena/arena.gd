@@ -79,6 +79,17 @@ var _bh_active:        bool    = false   # Is the roaming black hole currently v
 var _bh_position:      Vector2 = Vector2.ZERO
 var _bh_timer:         float   = 0.0    # Counts down: active duration or cooldown
 var _bh_fade:          float   = 0.0    # 0→1 appear, 1→0 vanish (over 0.4s each)
+var _gw_active:        bool    = false   # Gravity Well active
+var _gw_position:      Vector2 = Vector2.ZERO
+var _gw_timer:         float   = 0.0
+var _gw_fade:          float   = 0.0
+var _design_offset: Vector2 = Vector2.ZERO
+var _arena_centre:  Vector2 = Vector2.ZERO   # Canvas-space centre of the polygon bounding box
+var _arena_scale:   float   = 1.0            # Uniform scale applied to the polygon in portrait mode
+
+var _lives:              Dictionary = {}   # colour_type -> lives remaining
+var _zone_outward_dirs:  Dictionary = {}   # colour_type -> outward unit vector (for lives display)
+const STARTING_LIVES:    int        = 3
 
 
 func _ready() -> void:
@@ -109,20 +120,31 @@ func _process(delta: float) -> void:
 		if GameConfig.has_modifier("black_hole"):
 			_tick_black_hole(delta)
 			queue_redraw()
+		if GameConfig.has_modifier("gravity_wells"):
+			_tick_gravity_well(delta)
+			queue_redraw()
 		return
 
-	# Chaos Ball: halve the spawn interval
-	var effective_interval: float = ball_spawn_interval / 2.0 \
-		if GameConfig.has_modifier("chaos_ball") else ball_spawn_interval
+	# Spawn interval — stack modifiers multiplicatively
+	var effective_interval: float = ball_spawn_interval
+	if GameConfig.has_modifier("chaos_ball"):
+		effective_interval /= 2.0
+	# Final Countdown: last 10 seconds of a normal timed round double spawn rate
+	if GameConfig.has_modifier("final_countdown") and GameConfig.game_mode == "normal":
+		if round_duration - session_time <= 10.0:
+			effective_interval /= 2.0
 
 	spawn_timer += delta
 	if spawn_timer >= effective_interval:
 		spawn_timer = 0.0
 		_try_spawn_ball()
 
-	# Black Hole: roaming — appears at a random point for a few seconds then vanishes
+	# Black Hole and Gravity Wells: roaming hazards
 	if GameConfig.has_modifier("black_hole"):
 		_tick_black_hole(delta)
+		queue_redraw()
+	if GameConfig.has_modifier("gravity_wells"):
+		_tick_gravity_well(delta)
 		queue_redraw()
 
 
@@ -130,9 +152,68 @@ func _process(delta: float) -> void:
 
 func _build_active_colours() -> void:
 	## Build active_colours, _side_for_colour, _zone_angles from GameConfig.
-	_map_vertices  = _get_map_vertices(GameConfig.selected_map)
+	_map_vertices = _get_map_vertices(GameConfig.selected_map)
+	var vp := get_viewport_rect().size
+
+	const PORTRAIT_MARGIN: float = 0.0
+
+	if vp.y > vp.x:
+		# ── Portrait mode ──────────────────────────────────────────────────────
+		# Scale the arena polygon uniformly so its width fills the canvas, then
+		# pin the top edge near the top of the screen.  This makes the arena
+		# feel full-width on portrait phones/Steam Deck portrait orientations
+		# instead of sitting as a tiny 600-unit box in a 1280-unit-wide canvas.
+
+		# Bounding box of the raw (design-space) polygon
+		var min_x: float = INF;  var max_x: float = -INF
+		var min_y: float = INF;  var max_y: float = -INF
+		for v in _map_vertices:
+			min_x = minf(min_x, v.x); max_x = maxf(max_x, v.x)
+			min_y = minf(min_y, v.y); max_y = maxf(max_y, v.y)
+		var poly_w: float  = max_x - min_x
+		var poly_h: float  = max_y - min_y
+		var poly_cx: float = (min_x + max_x) / 2.0
+		var poly_cy: float = (min_y + max_y) / 2.0
+
+		# Uniform scale: polygon width → canvas width (minus margins)
+		var scale: float = (vp.x - PORTRAIT_MARGIN * 2.0) / poly_w
+		_arena_scale = scale
+
+		for i in _map_vertices.size():
+			_map_vertices[i] = Vector2(
+				poly_cx + (_map_vertices[i].x - poly_cx) * scale,
+				poly_cy + (_map_vertices[i].y - poly_cy) * scale
+			)
+
+		# After scaling the polygon's min corner is at:
+		#   (poly_cx - poly_w*scale/2,  poly_cy - poly_h*scale/2)
+		# Shift so that corner lands at (PORTRAIT_MARGIN, PORTRAIT_MARGIN).
+		_design_offset = Vector2(
+			PORTRAIT_MARGIN - (poly_cx - poly_w * scale / 2.0),
+			PORTRAIT_MARGIN - (poly_cy - poly_h * scale / 2.0)
+		)
+	else:
+		# ── Landscape mode ─────────────────────────────────────────────────────
+		_arena_scale = 1.0
+		_design_offset = Vector2(
+			maxf(0.0, (vp.x - ARENA_WIDTH) / 2.0),
+			maxf(0.0, (vp.y - ARENA_HEIGHT) / 2.0)
+		)
+
+	for i in _map_vertices.size():
+		_map_vertices[i] += _design_offset
+
+	# Cache the polygon bounding-box centre — used for ball spawning, pillar
+	# placement, the pause overlay and all angle calculations.
+	var bx_min: float = INF;  var bx_max: float = -INF
+	var by_min: float = INF;  var by_max: float = -INF
+	for v in _map_vertices:
+		bx_min = minf(bx_min, v.x); bx_max = maxf(bx_max, v.x)
+		by_min = minf(by_min, v.y); by_max = maxf(by_max, v.y)
+	_arena_centre = Vector2((bx_min + bx_max) / 2.0, (by_min + by_max) / 2.0)
+
 	var sides: Array = GameConfig.MAP_ZONE_SIDES[GameConfig.selected_map][GameConfig.num_players]
-	var centre := Vector2(ARENA_WIDTH, ARENA_HEIGHT) / 2.0
+	var centre := _arena_centre
 	var n: int = _map_vertices.size()
 
 	active_colours.clear()
@@ -149,6 +230,14 @@ func _build_active_colours() -> void:
 		var b: Vector2 = _map_vertices[(side_idx + 1) % n]
 		var mid: Vector2 = (a + b) / 2.0
 		_zone_angles[ct] = (mid - centre).angle()
+
+
+func get_design_offset() -> Vector2:
+	return _design_offset
+
+
+func get_design_centre() -> Vector2:
+	return _arena_centre
 
 
 func _get_map_vertices(map: String) -> PackedVector2Array:
@@ -217,14 +306,23 @@ func _init_scores() -> void:
 func _start_round() -> void:
 	is_game_over = false
 	collapsed_colours.clear()
+	_lives.clear()
+	if GameConfig.game_mode == "endless":
+		_lives[player_colour] = STARTING_LIVES
+	elif GameConfig.game_mode == "elimination":
+		for ct in active_colours:
+			_lives[ct] = STARTING_LIVES
 	if timer_display:
-		timer_display.round_duration = round_duration
-		timer_display.start_timer()
+		if GameConfig.game_mode == "normal":
+			timer_display.round_duration = round_duration
+			timer_display.start_timer()
+		else:
+			timer_display.visible = false
 	_spawn_ball()
 	_spawn_ball()
 
 
-func _end_round() -> void:
+func _end_round(player_eliminated: bool = false) -> void:
 	is_game_over = true
 	if timer_display:
 		timer_display.stop_timer()
@@ -240,9 +338,16 @@ func _end_round() -> void:
 		if ct not in collapsed_colours and scores[ct] > best_score:
 			best_score = scores[ct]
 			winner_ct  = ct
-	var player_won: bool = (winner_ct == player_colour)
 
-	var result: Dictionary = StatsManager.record_game_end(player_score, session_time, player_won)
+	# Count how many share the top score — a draw is not recorded as a win.
+	var top_count: int = 0
+	for ct in scores.keys():
+		if ct not in collapsed_colours and scores[ct] == best_score:
+			top_count += 1
+	var is_draw: bool    = top_count > 1
+	var player_won: bool = (not player_eliminated and not is_draw and winner_ct == player_colour)
+
+	var result: Dictionary = StatsManager.record_game_end(player_score, session_time, player_won, is_draw)
 
 	if game_over_screen:
 		game_over_screen.show_results(
@@ -251,7 +356,8 @@ func _end_round() -> void:
 			result.get("is_new_high_score", false),
 			result.get("xp_earned", 0),
 			result.get("level_before", 0),
-			result.get("level_after", 0)
+			result.get("level_after", 0),
+			player_eliminated
 		)
 
 
@@ -301,7 +407,7 @@ func _create_segment_wall(point_a: Vector2, point_b: Vector2) -> void:
 
 	var col_shape := CollisionShape2D.new()
 	var rect      := RectangleShape2D.new()
-	rect.size = Vector2(dir.length(), WALL_THICKNESS)
+	rect.size = Vector2(dir.length(), WALL_THICKNESS * _arena_scale)
 	col_shape.shape = rect
 	wall.add_child(col_shape)
 
@@ -325,11 +431,14 @@ func _setup_colour_zones() -> void:
 		var edge_angle: float = edge_dir.angle()
 		var edge_len: float   = (b - a).length()
 
-		var zone_pos: Vector2 = edge_mid + outward * (ZONE_DEPTH / 2.0)
-		_create_zone(ct, zone_pos, Vector2(edge_len, ZONE_DEPTH), edge_angle)
+		_zone_outward_dirs[ct] = outward
+
+		var zone_depth: float  = ZONE_DEPTH * _arena_scale
+		var zone_pos: Vector2 = edge_mid + outward * (zone_depth / 2.0)
+		_create_zone(ct, zone_pos, Vector2(edge_len, zone_depth), edge_angle)
 		# Parallelogram draw shape: corners at the polygon vertices so adjacent
 		# zones share corners and form a seamless frame (no gaps or overlaps).
-		zones[ct].set_draw_shape(a, b, outward, ZONE_DEPTH)
+		zones[ct].set_draw_shape(a, b, outward, zone_depth)
 
 
 func _create_zone(ct: int, pos: Vector2, size: Vector2, rotation_rad: float) -> void:
@@ -354,7 +463,7 @@ func _create_zone(ct: int, pos: Vector2, size: Vector2, rotation_rad: float) -> 
 
 func _setup_paddles() -> void:
 	var n: int = _map_vertices.size()
-	var half_paddle: float = 50.0  # half of default paddle_length
+	var half_paddle: float = 50.0 * _arena_scale
 
 	# Build set of side indices that have active zones, for corner checks.
 	var active_sides: Array = []
@@ -385,7 +494,7 @@ func _setup_paddles() -> void:
 
 		# Paddle sits just inside the polygon edge, guarding the open zone side
 		var paddle_pos: Vector2 = edge_mid \
-			- outward * (PADDLE_THICKNESS / 2.0 + 5.0)
+			- outward * ((PADDLE_THICKNESS / 2.0 + 5.0) * _arena_scale)
 
 		_create_paddle(ct, paddle_pos, edge_dir, outward, edge_angle,
 			min_off, max_off)
@@ -403,17 +512,20 @@ func _create_paddle(
 	var paddle: CharacterBody2D
 	if ct == player_colour:
 		paddle = player_paddle_scene.instantiate()
+		paddle.use_deflector = GameConfig.has_power_up_in_slot("deflector")
 	else:
 		paddle = ai_paddle_scene.instantiate()
 
-	paddle.colour_type    = ct
-	paddle.move_direction = move_dir
-	paddle.outward_dir    = outward
-	paddle.zone_centre    = pos
-	paddle.min_offset     = min_off
-	paddle.max_offset     = max_off
-	paddle.position       = pos
-	paddle.rotation       = rotation_rad
+	paddle.colour_type     = ct
+	paddle.move_direction  = move_dir
+	paddle.outward_dir     = outward
+	paddle.zone_centre     = pos
+	paddle.min_offset      = min_off
+	paddle.max_offset      = max_off
+	paddle.position        = pos
+	paddle.rotation        = rotation_rad
+	paddle.paddle_length    = 100.0 * _arena_scale
+	paddle.paddle_thickness = PADDLE_THICKNESS * _arena_scale
 
 	add_child(paddle)
 	paddles[ct] = paddle
@@ -431,7 +543,7 @@ func _setup_score_displays() -> void:
 		var outward: Vector2  = Vector2(-edge_dir.y, edge_dir.x)  # True edge normal
 		var edge_mid: Vector2 = (a + b) / 2.0
 		# Place 50px inside the polygon so it's visible behind the paddle
-		var display_pos: Vector2 = edge_mid - outward * 50.0
+		var display_pos: Vector2 = edge_mid - outward * 50.0 * _arena_scale
 		_create_score_display(ct, display_pos - Vector2(40, 17), Vector2(80, 35))
 
 
@@ -448,7 +560,7 @@ func _create_score_display(ct: int, pos: Vector2, ctrl_size: Vector2) -> void:
 
 func _setup_timer_display() -> void:
 	timer_display = timer_display_scene.instantiate()
-	timer_display.position = Vector2(ARENA_WIDTH / 2.0 - 75, ARENA_HEIGHT / 2.0 - 20)
+	timer_display.position = get_design_centre() - Vector2(75, 20)
 	timer_display.round_duration = round_duration
 	timer_display.timer_expired.connect(_on_timer_expired)
 	add_child(timer_display)
@@ -495,7 +607,11 @@ func _on_pause_settings() -> void:
 
 func _on_settings_done() -> void:
 	settings_overlay = null
-	pause_menu.show_after_settings()
+	# Window may have been resized — physics nodes are already placed at
+	# old canvas positions so a full scene reload is the cleanest recovery.
+	# SceneTree.paused persists across scene changes so clear it first.
+	get_tree().paused = false
+	get_tree().reload_current_scene()
 
 
 func _on_pause_exit() -> void:
@@ -515,20 +631,34 @@ func _on_timer_expired() -> void:
 
 func _on_score_up(ct: int, points: int) -> void:
 	if scores.has(ct):
+		var old_score: int = scores[ct]
 		scores[ct] += points
 		if score_displays.has(ct):
 			score_displays[ct].set_score(scores[ct])
+		# Endless: gain 1 life per 100-point milestone crossed
+		if GameConfig.game_mode == "endless" and ct == player_colour:
+			var gained: int = scores[ct] / 100 - old_score / 100
+			if gained > 0:
+				_lives[ct] = _lives.get(ct, 0) + gained
 
 
 func _on_score_down(ct: int, points: int) -> void:
+	# Endless: player wrong catches cost a life, not score
+	if GameConfig.game_mode == "endless" and ct == player_colour:
+		return
 	if scores.has(ct):
 		scores[ct] = max(0, scores[ct] - points)
 		if score_displays.has(ct):
 			score_displays[ct].set_score(scores[ct])
 
 
-func _on_wrong_catch(_ball: Node2D, _ct: int) -> void:
-	pass
+func _on_wrong_catch(_ball: Node2D, ct: int) -> void:
+	match GameConfig.game_mode:
+		"endless":
+			if ct == player_colour:
+				_lose_life(ct)
+		"elimination":
+			_lose_life(ct)
 
 
 # ── Ball spawning ──────────────────────────────────────────────────────────────
@@ -542,13 +672,21 @@ func _try_spawn_ball() -> void:
 
 func _spawn_ball() -> void:
 	var ball := ball_scene.instantiate()
-	ball.position = Vector2(ARENA_WIDTH / 2.0, ARENA_HEIGHT / 2.0)
+	ball.position   = get_design_centre()
+	ball.arena_scale = _arena_scale
 
 	var ct: int
 	if GameConfig.has_modifier("load_balanced"):
 		ct = _get_lowest_score_colour()
 	else:
-		ct = active_colours[spawn_colour_index % active_colours.size()]
+		var available: Array = []
+		for c in active_colours:
+			if c not in collapsed_colours:
+				available.append(c)
+		if available.is_empty():
+			ball.queue_free()
+			return
+		ct = available[spawn_colour_index % available.size()]
 		spawn_colour_index += 1
 	ball.set_colour(ct)
 	ball.set_random_size()
@@ -596,10 +734,11 @@ func _do_ball_split(original: RigidBody2D, count: int, spread_angle: float) -> v
 
 	for i in count:
 		var t: RigidBody2D = ball_scene.instantiate()
-		t.position   = pos
+		t.position    = pos
+		t.arena_scale = _arena_scale
 		t.set_colour(ct)
-		t.size_scale = max(0.4, sz * 0.75)
-		t.can_split  = false
+		t.size_scale  = max(0.4, sz * 0.75)
+		t.can_split   = false
 		add_child(t)
 		t._apply_size()
 
@@ -634,8 +773,10 @@ func _tick_black_hole(delta: float) -> void:
 		_bh_fade   = minf(_bh_fade + delta / FADE_TIME, 1.0)
 
 		# Pull and destroy balls while visible
-		var range_sq: float = BLACK_HOLE_PULL_RANGE * BLACK_HOLE_PULL_RANGE
-		var core_sq: float  = BLACK_HOLE_CORE_RADIUS * BLACK_HOLE_CORE_RADIUS
+		var bh_range: float = BLACK_HOLE_PULL_RANGE * _arena_scale
+		var bh_core:  float = BLACK_HOLE_CORE_RADIUS * _arena_scale
+		var range_sq: float = bh_range * bh_range
+		var core_sq: float  = bh_core * bh_core
 		for ball in get_tree().get_nodes_in_group("balls"):
 			var offset: Vector2 = _bh_position - ball.global_position
 			var dist_sq: float  = offset.length_squared()
@@ -643,8 +784,8 @@ func _tick_black_hole(delta: float) -> void:
 				ball.queue_free()
 			elif dist_sq <= range_sq:
 				var dist: float   = sqrt(dist_sq)
-				var scale: float  = 1.0 - (dist / BLACK_HOLE_PULL_RANGE)
-				ball.apply_central_force(offset.normalized() * BLACK_HOLE_FORCE * scale * _bh_fade)
+				var pull: float   = 1.0 - (dist / bh_range)
+				ball.apply_central_force(offset.normalized() * BLACK_HOLE_FORCE * _arena_scale * pull * _bh_fade)
 
 		if _bh_timer <= 0.0:
 			# Begin fade-out then switch to cooldown
@@ -659,11 +800,48 @@ func _tick_black_hole(delta: float) -> void:
 			_bh_timer    = randf_range(BLACK_HOLE_ACTIVE_MIN, BLACK_HOLE_ACTIVE_MAX)
 			_bh_position = _random_interior_point()
 
+func _tick_gravity_well(delta: float) -> void:
+	## Like the black hole but balls are deflected, not destroyed.
+	## Uses slightly weaker pull and shorter active windows so it plays differently.
+	const FADE_TIME:     float = 0.4
+	const PULL_RANGE:    float = 140.0
+	const PULL_FORCE:    float = 450.0
+	const ACTIVE_MIN:    float = 5.0
+	const ACTIVE_MAX:    float = 9.0
+	const COOLDOWN_MIN:  float = 5.0
+	const COOLDOWN_MAX:  float = 11.0
+
+	if _gw_active:
+		_gw_timer -= delta
+		_gw_fade   = minf(_gw_fade + delta / FADE_TIME, 1.0)
+
+		var gw_range: float = PULL_RANGE * _arena_scale
+		var range_sq: float = gw_range * gw_range
+		for ball in get_tree().get_nodes_in_group("balls"):
+			var offset: Vector2 = _gw_position - ball.global_position
+			var dist_sq: float  = offset.length_squared()
+			if dist_sq > 0.0 and dist_sq <= range_sq:
+				var dist: float  = sqrt(dist_sq)
+				var pull: float  = 1.0 - (dist / gw_range)
+				ball.apply_central_force(offset.normalized() * PULL_FORCE * _arena_scale * pull * _gw_fade)
+
+		if _gw_timer <= 0.0:
+			_gw_active = false
+			_gw_timer  = randf_range(COOLDOWN_MIN, COOLDOWN_MAX)
+	else:
+		_gw_fade  = maxf(_gw_fade - delta / FADE_TIME, 0.0)
+		_gw_timer -= delta
+		if _gw_timer <= 0.0:
+			_gw_active   = true
+			_gw_timer    = randf_range(ACTIVE_MIN, ACTIVE_MAX)
+			_gw_position = _random_interior_point()
+
+
 func _random_interior_point() -> Vector2:
 	## Returns a random point well inside the polygon (using bounding box rejection).
-	var margin: float = 120.0
-	var min_x: float = 0.0; var max_x: float = 0.0
-	var min_y: float = 0.0; var max_y: float = 0.0
+	var margin: float = 120.0 * _arena_scale
+	var min_x: float = INF;  var max_x: float = -INF
+	var min_y: float = INF;  var max_y: float = -INF
 	for v in _map_vertices:
 		min_x = minf(min_x, v.x); max_x = maxf(max_x, v.x)
 		min_y = minf(min_y, v.y); max_y = maxf(max_y, v.y)
@@ -672,18 +850,18 @@ func _random_interior_point() -> Vector2:
 		var p := Vector2(randf_range(min_x, max_x), randf_range(min_y, max_y))
 		if Geometry2D.is_point_in_polygon(p, _map_vertices):
 			return p
-	# Fallback: centre
-	return Vector2(ARENA_WIDTH, ARENA_HEIGHT) / 2.0
+	# Fallback: design centre
+	return get_design_centre()
 
 
 func _setup_pillars() -> void:
 	## Spawn evenly-spaced bouncy pillars around the arena centre.
 	if not GameConfig.has_modifier("pillars"):
 		return
-	var centre: Vector2 = Vector2(ARENA_WIDTH, ARENA_HEIGHT) / 2.0
+	var centre: Vector2 = get_design_centre()
 	for i in PILLAR_COUNT:
 		var angle: float = i * TAU / PILLAR_COUNT
-		var pos: Vector2 = centre + Vector2.from_angle(angle) * PILLAR_RING_RADIUS
+		var pos: Vector2 = centre + Vector2.from_angle(angle) * PILLAR_RING_RADIUS * _arena_scale
 		_create_pillar(pos)
 
 
@@ -698,7 +876,7 @@ func _create_pillar(pos: Vector2) -> void:
 
 	var col_shape := CollisionShape2D.new()
 	var circle    := CircleShape2D.new()
-	circle.radius = PILLAR_RADIUS
+	circle.radius = PILLAR_RADIUS * _arena_scale
 	col_shape.shape = circle
 	pillar.add_child(col_shape)
 
@@ -715,6 +893,10 @@ func _draw() -> void:
 		_draw_pillars()
 	if GameConfig.has_modifier("black_hole"):
 		_draw_black_hole()
+	if GameConfig.has_modifier("gravity_wells"):
+		_draw_gravity_well()
+	if not _lives.is_empty():
+		_draw_lives()
 
 
 func _draw_arena_background() -> void:
@@ -722,7 +904,7 @@ func _draw_arena_background() -> void:
 	## Draw a full-screen rect first, then overdraw the polygon interior with the arena colour.
 	var bg := Color(0.05, 0.05, 0.08, 1.0)
 	var arena_fill := Color(0.08, 0.08, 0.12, 1.0)
-	draw_rect(Rect2(Vector2.ZERO, Vector2(ARENA_WIDTH, ARENA_HEIGHT)), bg)
+	draw_rect(Rect2(Vector2.ZERO, get_viewport_rect().size), bg)
 	draw_colored_polygon(_map_vertices, arena_fill)
 
 
@@ -741,41 +923,160 @@ func _draw_polygon_outline() -> void:
 
 		if i in active_sides:
 			# Active zone sides are dim — the paddle/zone sit here
-			draw_line(a, b, Color(0.4, 0.4, 0.5, 0.5), 2.0)
+			draw_line(a, b, Color(0.4, 0.4, 0.5, 0.5), 2.0, true)
 		else:
 			# Solid wall sides
-			draw_line(a, b, Color(0.7, 0.7, 0.8, 0.9), 3.0)
+			draw_line(a, b, Color(0.7, 0.7, 0.8, 0.9), 3.0, true)
 
 
 func _draw_pillars() -> void:
+	var pr: float = PILLAR_RADIUS * _arena_scale
 	for pillar in _pillars:
 		var pos: Vector2 = pillar.position
-		draw_circle(pos, PILLAR_RADIUS, Color(0.22, 0.22, 0.32, 1.0))
-		draw_arc(pos, PILLAR_RADIUS, 0, TAU, 24, Color(0.55, 0.55, 0.72, 1.0), 2.5)
+		draw_circle(pos, pr, Color(0.22, 0.22, 0.32, 1.0), true, -1.0, true)
+		draw_arc(pos, pr, 0, TAU, 48, Color(0.55, 0.55, 0.72, 1.0), 2.5, true)
 		# Inner highlight
-		draw_arc(pos, PILLAR_RADIUS * 0.55, 0, TAU, 16, Color(0.65, 0.65, 0.82, 0.4), 1.5)
+		draw_arc(pos, pr * 0.55, 0, TAU, 32, Color(0.65, 0.65, 0.82, 0.4), 1.5, true)
 
 
 func _draw_black_hole() -> void:
 	if _bh_fade <= 0.0:
 		return
-	var pos: Vector2 = _bh_position
-	var f: float     = _bh_fade          # 0–1 fade multiplier
-	var t: float     = Time.get_ticks_msec() / 1000.0
+	var pos: Vector2  = _bh_position
+	var f: float      = _bh_fade          # 0–1 fade multiplier
+	var t: float      = Time.get_ticks_msec() / 1000.0
+	var bhr: float    = BLACK_HOLE_RADIUS * _arena_scale
+	var bhpr: float   = BLACK_HOLE_PULL_RANGE * _arena_scale
 
 	# Faint pull-range glow rings
 	for i in 3:
-		var ring_r: float     = BLACK_HOLE_PULL_RANGE * (0.35 + i * 0.22)
+		var ring_r: float     = bhpr * (0.35 + i * 0.22)
 		var ring_alpha: float = (0.07 - i * 0.018) * f
-		draw_circle(pos, ring_r, Color(0.45, 0.1, 0.8, ring_alpha))
+		draw_circle(pos, ring_r, Color(0.45, 0.1, 0.8, ring_alpha), true, -1.0, true)
 
 	# Spinning accretion arc wisps
 	for i in 4:
 		var a0: float = i * TAU / 4.0 + t * 1.8
-		draw_arc(pos, BLACK_HOLE_PULL_RANGE * 0.52, a0, a0 + 0.5, 10, Color(0.55, 0.2, 0.9, 0.45 * f), 2.0)
-		draw_arc(pos, BLACK_HOLE_PULL_RANGE * 0.32, a0 + 0.35, a0 + 0.85, 8, Color(0.6, 0.25, 0.95, 0.3 * f), 1.5)
+		draw_arc(pos, bhpr * 0.52, a0, a0 + 0.5, 12, Color(0.55, 0.2, 0.9, 0.45 * f), 2.0, true)
+		draw_arc(pos, bhpr * 0.32, a0 + 0.35, a0 + 0.85, 10, Color(0.6, 0.25, 0.95, 0.3 * f), 1.5, true)
 
 	# Core
-	draw_circle(pos, BLACK_HOLE_RADIUS * f, Color(0.03, 0.0, 0.08, 1.0))
-	draw_arc(pos, BLACK_HOLE_RADIUS * f, 0, TAU, 32, Color(0.65, 0.25, 1.0, 0.95 * f), 3.0)
-	draw_circle(pos, BLACK_HOLE_RADIUS * 0.45 * f, Color(0.0, 0.0, 0.0, 1.0))
+	draw_circle(pos, bhr * f, Color(0.03, 0.0, 0.08, 1.0), true, -1.0, true)
+	draw_arc(pos, bhr * f, 0, TAU, 64, Color(0.65, 0.25, 1.0, 0.95 * f), 3.0, true)
+	draw_circle(pos, bhr * 0.45 * f, Color(0.0, 0.0, 0.0, 1.0), true, -1.0, true)
+
+
+func _draw_gravity_well() -> void:
+	if _gw_fade <= 0.0:
+		return
+	const PULL_RANGE: float = 140.0
+	const RADIUS:     float = 18.0
+	var pos: Vector2  = _gw_position
+	var f: float      = _gw_fade
+	var t: float      = Time.get_ticks_msec() / 1000.0
+	var gwr: float    = RADIUS * _arena_scale
+	var gwpr: float   = PULL_RANGE * _arena_scale
+
+	# Pull-range glow rings (teal/cyan palette to distinguish from black hole)
+	for i in 3:
+		var ring_r: float     = gwpr * (0.3 + i * 0.22)
+		var ring_alpha: float = (0.07 - i * 0.018) * f
+		draw_circle(pos, ring_r, Color(0.1, 0.55, 0.7, ring_alpha), true, -1.0, true)
+
+	# Spinning arc wisps (counter-clockwise to feel distinct)
+	for i in 4:
+		var a0: float = i * TAU / 4.0 - t * 1.5
+		draw_arc(pos, gwpr * 0.5, a0, a0 + 0.5, 12, Color(0.2, 0.75, 0.9, 0.4 * f), 2.0, true)
+		draw_arc(pos, gwpr * 0.3, a0 + 0.3, a0 + 0.8, 10, Color(0.25, 0.8, 0.95, 0.25 * f), 1.5, true)
+
+	# Core — open ring (no solid fill) to signal balls pass through safely
+	draw_circle(pos, gwr * f, Color(0.05, 0.18, 0.25, 0.9), true, -1.0, true)
+	draw_arc(pos, gwr * f, 0, TAU, 64, Color(0.3, 0.9, 1.0, 0.95 * f), 3.0, true)
+	# Inner ring gap — visually signals "no destruction zone"
+	draw_arc(pos, gwr * 0.5 * f, 0, TAU, 32, Color(0.4, 1.0, 1.0, 0.5 * f), 2.0, true)
+
+
+func _draw_lives() -> void:
+	## Draw life dots near each zone's score display.
+	## In endless mode only the player zone is shown.
+	for ct in _lives.keys():
+		if ct in collapsed_colours:
+			continue
+		if not score_displays.has(ct):
+			continue
+		var lives: int      = _lives[ct]
+		var col: Color      = ColourData.get_color(ct)
+		var outward: Vector2 = _zone_outward_dirs.get(ct, Vector2(0.0, 1.0))
+		var along: Vector2   = Vector2(-outward.y, outward.x)  # perpendicular, along edge
+
+		# Centre of score display, then step outward toward the edge
+		var sd_centre: Vector2 = score_displays[ct].position + Vector2(40.0, 17.0)
+		var base_pos: Vector2  = sd_centre + outward * 28.0 * _arena_scale
+
+		var dot_r: float       = 5.0
+		var dot_spacing: float = 14.0
+		var half_span: float   = (STARTING_LIVES - 1) * dot_spacing / 2.0
+
+		for i in STARTING_LIVES:
+			var dot_pos: Vector2 = base_pos + along * (i * dot_spacing - half_span)
+			var filled: bool = i < lives
+			var fill_col: Color   = Color(col.r, col.g, col.b, 0.9) if filled else Color(col.r, col.g, col.b, 0.18)
+			var border_col: Color = Color(col.r, col.g, col.b, 1.0) if filled else Color(col.r, col.g, col.b, 0.4)
+			draw_circle(dot_pos, dot_r, fill_col, true, -1.0, true)
+			draw_arc(dot_pos, dot_r, 0, TAU, 24, border_col, 1.0, true)
+
+
+func _lose_life(ct: int) -> void:
+	## Deduct one life from ct. Triggers zone collapse or game over at zero.
+	if ct in collapsed_colours:
+		return
+	_lives[ct] = max(0, _lives.get(ct, 0) - 1)
+	queue_redraw()
+	if _lives[ct] == 0:
+		if GameConfig.game_mode == "elimination":
+			_collapse_zone(ct)
+		else:  # endless — only player reaches this
+			_end_round(true)
+
+
+func _collapse_zone(ct: int) -> void:
+	## Seal a collapsed zone: remove its paddle and zone, wall off the edge, end round if needed.
+	if ct in collapsed_colours:
+		return
+	collapsed_colours.append(ct)
+
+	# Remove the zone (balls can no longer enter it)
+	if zones.has(ct):
+		zones[ct].queue_free()
+		zones.erase(ct)
+
+	# Remove the paddle
+	if paddles.has(ct):
+		paddles[ct].queue_free()
+		paddles.erase(ct)
+
+	# Seal the previously open edge with a wall
+	var n: int       = _map_vertices.size()
+	var side_idx: int = _side_for_colour.get(ct, -1)
+	if side_idx >= 0:
+		var a: Vector2 = _map_vertices[side_idx]
+		var b: Vector2 = _map_vertices[(side_idx + 1) % n]
+		_create_segment_wall(a, b)
+
+	# Remove score display
+	if score_displays.has(ct):
+		score_displays[ct].queue_free()
+		score_displays.erase(ct)
+
+	queue_redraw()
+
+	# End round if player was eliminated, or only one active zone remains
+	if ct == player_colour:
+		_end_round(true)
+	else:
+		var remaining: int = 0
+		for c in active_colours:
+			if c not in collapsed_colours:
+				remaining += 1
+		if remaining <= 1:
+			_end_round()

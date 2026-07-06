@@ -35,7 +35,7 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	var font := ThemeDB.fallback_font
+	var font := FontManager.get_font()
 	var font_size: int = 28
 
 	var time_text: String

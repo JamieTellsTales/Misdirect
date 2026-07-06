@@ -21,153 +21,105 @@ To run the game:
 - **Project Type**: 2D
 - **Target Platforms**: Windows (initial), Steam + Android (post-prototype)
 
-## Game Design Overview
+## Game Design (as implemented)
 
 ### Core Concept
-The play area is a rectangular arena with IT departments occupying each edge/zone. Tickets (balls) bounce around the arena. Each department has a colour — you want to **catch your own colour** tickets to score points and clear your queue, and **deflect all other colours** away from your zone. Catching the wrong ticket triggers a penalty chain.
+The arena is a polygon (triangle up to octagon) with a coloured zone on some or all
+edges. Balls spawn at the centre and bounce around. Each zone belongs to a colour —
+you want to **let your own colour through** into your zone to score points, and
+**deflect all other colours** away. Catching a wrong-colour ball costs score (or a
+life, depending on game mode).
 
-### Departments & Ticket Colours
+The player always controls the **GREEN** paddle on the bottom edge (side 0). All
+other zones are AI-controlled paddles with per-colour personalities.
 
-| Department     | Colour  | Ticket Traits                                                                 |
-|----------------|---------|-------------------------------------------------------------------------------|
-| Service Desk   | Blue    | Fast, frequent, low value. Swarm in large numbers.                            |
-| Infrastructure | Green   | Slow, heavy, high value. Large hitbox, predictable movement.                  |
-| Security       | Red     | Unpredictable, changes direction mid-flight. Escalates if wrongly caught.     |
-| Development    | Yellow  | Start slow, randomly accelerate. Deceptively manageable at first.             |
-| Management     | Purple  | Huge, slow, massive hitbox. Rare but clogs queues badly if caught wrongly.    |
+### Colours
+Defined in `scripts/resources/department_data.gd` (`ColourData`, `ColourType` enum):
+BLUE, GREEN, RED, YELLOW, PURPLE, ORANGE, CYAN, PINK. Up to 8 players/zones.
 
-### Paddle & Zone Mechanics
-Each department has a paddle that **deflects** tickets back into play. Behind the paddle is the department's **zone** — if a ticket gets past the paddle and enters the zone, it is **automatically caught** by that department.
+AI personalities live in `ai_paddle.gd::_apply_personality()` — each colour has its
+own `reaction_delay`, `accuracy`, `move_speed`, `prediction_strength`, plus quirks
+(RED deflects its own colour, YELLOW ignores purple, BLUE panics with many balls,
+PURPLE is slow and inaccurate).
 
-- **Paddle** — deflects tickets back into the arena
-- **Zone** — any ticket entering the zone is caught (added to that department's queue)
+### Game Modes (`GameConfig.game_mode`)
+- **normal** — timed round (`round_duration`, default 120s). Highest score wins;
+  ties are draws. Wrong catch deducts score (floor 0).
+- **endless** — no timer. Player has 3 lives; wrong catch costs a life (not score);
+  +1 life per 100 points milestone. Game ends when lives hit 0 (`_end_round(true)`).
+- **elimination** — no timer. Every zone has 3 lives. At 0 lives, the zone is
+  collapsed (`_collapse_zone`): paddle/zone/score display removed and the edge is
+  sealed with a wall. Player collapse ends the game; otherwise last zone standing wins.
 
-The player controls one department. All other departments are AI-controlled with personalities (see AI section). The goal is to deflect wrong-colour tickets away while letting your own colour through to be caught.
+Lives are drawn as dots near each score display (`_draw_lives` in arena.gd).
 
-### Ticket Queue & Scoring
-- Each department has a visible queue with a counter
-- Catching your own colour ticket adds it to your queue; tickets are cleared automatically over time (simulating resolution)
-- Each resolved ticket scores points based on ticket type
-- SLA timers count down on queued tickets — missing SLA loses points
-- Wrong-colour tickets in your queue **cannot be resolved** — they drain your SLA timer and must be manually reassigned
+### Balls
+- Random size 0.5–2.0; smaller = faster, bigger = more points (10–30).
+- Wrong-catch penalty chain exists on the ball (`apply_wrong_catch_penalty`:
+  speed-up, then blame stamp) **but is currently never called** — zones destroy
+  every ball they catch. Known gap vs the original design.
 
-### Wrong Ticket Penalty Chain
-Catching the wrong colour triggers an escalating penalty:
-1. **First offence** — ticket re-enters play at increased speed
-2. **Second offence (or catching another wrong ticket quickly)** — ticket splits into two on re-entry
-3. **Accumulated wrong catches** — point deduction and a "blame stamp" placed on the ticket (other departments get a bonus for catching a stamped ticket you misdirected)
+### Maps & Player Counts
+`GameConfig.MAP_VALID_PLAYERS` / `MAP_ZONE_SIDES` define which polygon sides are
+active zones per (map, player count). Maps: triangle, square, pentagon, hexagon,
+heptagon, octagon. Maps unlock via wins on the previous map
+(`MAP_UNLOCK_REQUIREMENTS`, checked by `StatsManager.is_map_unlocked`).
 
-### Ticket Types & Special Behaviours
-
-| Type                     | Behaviour                                              |
-|--------------------------|--------------------------------------------------------|
-| Password Reset           | Fast, predictable, common                              |
-| Network Outage           | Slow, large, high value                                |
-| Phishing Alert           | Erratic movement, splits on wrong catch                |
-| Feature Request          | Accelerates randomly after a few bounces               |
-| "Can you just quickly…"  | Splits into three smaller tickets on first deflect     |
-| Vague Strategic Request  | Enormous hitbox, very slow, almost impossible to dodge |
-
-### Win / Lose Conditions
-- **Win** — survive until end of the working day (time-limited round) with the highest score
-- **Lose** — queue overflows past maximum capacity (department collapses and is out of the round)
-- Optional: last department standing mode
-
-### AI Department Personalities
-AI departments should feel believable and satirical:
-- **Service Desk AI** — reactive, occasionally panics and misses their own tickets
-- **Infrastructure AI** — slow to respond, rarely misses but takes its time
-- **Security AI** — paranoid, deflects almost everything including its own tickets sometimes
-- **Development AI** — distracted, will ignore tickets that look like Management colour
-- **Management AI** — almost never catches anything, somehow avoids blame
+### Power-Ups & Modifiers
+- **Power-ups** (`GameConfig.POWER_UPS`) are bought with tokens in the shop and
+  assigned to up to 3 slots pre-game (`power_up_slots`). Slots unlock by level +
+  token fee (`POWER_UP_SLOT_DEFS`; keys SPACE/Q/E). Hold-key power-ups (gravity,
+  anti_gravity, cyclone) are handled in `player_paddle.gd`; on-hit power-ups
+  (railgun, splits, deflector) in `ticket.gd` / `paddle.gd`.
+- **Modifiers** (`GameConfig.MODIFIERS`) are free toggles unlocked by level:
+  rotated_colours, chaos_ball, load_balanced, random_directions, extra_time,
+  final_countdown, speed_ball, black_hole, gravity_wells, pillars. Implemented
+  in arena.gd (spawn logic, `_tick_black_hole`, `_tick_gravity_well`, pillars).
 
 ---
 
-## Project Architecture
+## Architecture
 
-### Autoloads (Global Singletons)
+### Autoloads (registered in project.godot, in order)
 
-| Autoload         | Purpose                                                        |
-|------------------|----------------------------------------------------------------|
-| `Global`         | Game state, scores, round settings, active departments         |
-| `RoundManager`   | Round timer, win/lose detection, phase transitions             |
-| `TicketManager`  | Spawns tickets, manages ticket pool, tracks ticket state       |
-| `ScoreManager`   | Points, SLA tracking, penalty chain state per department       |
-| `AudioManager`   | Sound effects and music                                        |
-| `InputManager`   | Global keyboard shortcuts, pause handling                      |
+| Autoload          | Purpose                                                             |
+|-------------------|---------------------------------------------------------------------|
+| `GameConfig`      | Per-run selections: mode, map, player count, power-up slots, modifiers. Canonical POWER_UPS / MODIFIERS lists. `reset()` on PLAY. |
+| `ProfileManager`  | Player profiles under `user://profiles/`. Must load before StatsManager. |
+| `AudioManager`    | Music crossfade + generated SFX. SFX players use `PROCESS_MODE_ALWAYS` so they play while the tree is paused. |
+| `SettingsManager` | Audio/display settings, resolution list (landscape + portrait), persisted to `user://settings.cfg` (device-level, not per-profile). |
+| `FontManager`     | Serves the accessibility font (`get_font()`); all UI uses this instead of ThemeDB. |
+| `StatsManager`    | Per-profile lifetime stats (per-mode high scores/game counts, wins/draws/losses, tokens + total earned, XP/level, unlocks). Persists via ConfigFile per profile. |
 
-### Key Signals
+Note: `scripts/autoload/score_manager.gd`, `scripts/ui/queue_display.gd`,
+`scripts/resources/ticket_data.gd` are **legacy from the original ticket/SLA
+design and are not registered or used**.
 
-```gdscript
-# TicketManager
-signal ticket_spawned(ticket: Ticket)
-signal ticket_caught(ticket: Ticket, department: Department)
-signal ticket_wrong_catch(ticket: Ticket, department: Department)
-signal ticket_split(original: Ticket, new_tickets: Array)
-
-# ScoreManager
-signal score_changed(department: Department, new_score: int)
-signal sla_missed(ticket: Ticket, department: Department)
-signal penalty_applied(department: Department, penalty_type: String)
-
-# RoundManager
-signal round_started
-signal round_ended(winner: Department)
-signal department_collapsed(department: Department)
+### Scene Flow
 ```
-
-### Project Structure
+main_menu → mode_select → map_select → pre_game_config → arena
+                                                            ├─ pause_menu (overlay, ESC)
+                                                            │    └─ settings_screen (overlay; reloads arena on exit)
+                                                            └─ game_over (overlay) → replay arena / main_menu
+main_menu also → settings_screen, stats_screen, shop, profile_select/profile_setup
 ```
-Misdirect/
-├── scenes/
-│   ├── main_menu.tscn          # Start screen, department select
-│   ├── arena.tscn              # Main gameplay scene
-│   ├── hud.tscn                # Score, queue, SLA timers overlay
-│   ├── game_over.tscn          # End of round results screen
-│   └── components/
-│       ├── ticket.tscn         # Individual ticket ball
-│       ├── paddle.tscn         # Department paddle (player or AI)
-│       ├── queue_display.tscn  # Per-department queue UI
-│       └── department_zone.tscn # Arena zone ownership area
-├── scripts/
-│   ├── autoload/
-│   │   ├── global.gd
-│   │   ├── round_manager.gd
-│   │   ├── ticket_manager.gd
-│   │   ├── score_manager.gd
-│   │   ├── audio_manager.gd
-│   │   └── input_manager.gd
-│   ├── arena/
-│   │   ├── arena.gd            # Arena setup, boundary logic
-│   │   └── department_zone.gd  # Zone ownership and collision
-│   ├── ticket/
-│   │   ├── ticket.gd           # Base ticket physics and state
-│   │   └── ticket_types.gd     # Ticket type definitions and behaviours
-│   ├── paddle/
-│   │   ├── paddle.gd           # Base paddle logic
-│   │   ├── player_paddle.gd    # Player input handling
-│   │   └── ai_paddle.gd        # AI behaviour per department personality
-│   ├── ui/
-│   │   ├── hud.gd
-│   │   ├── queue_display.gd
-│   │   └── sla_timer.gd
-│   └── resources/
-│       ├── department_data.gd  # Department colour, name, personality config
-│       └── ticket_data.gd      # Ticket type definitions as resources
-├── assets/
-│   ├── sounds/
-│   │   ├── catch.wav
-│   │   ├── deflect.wav
-│   │   ├── wrong_catch.wav
-│   │   ├── split.wav
-│   │   └── music/
-│   └── fonts/
-├── docs/
-│   ├── game_design.md          # Full GDD (this file summarised)
-│   ├── ticket_types.md         # Ticket behaviour reference
-│   ├── ai_behaviour.md         # AI personality rules
-│   └── steam_notes.md          # Steam integration notes for later
-└── project.godot
+First run with no profiles jumps straight to profile_setup.
+
+### Key Scripts
+```
+scripts/
+├── autoload/            # See table above (+ legacy score_manager.gd)
+├── arena/
+│   ├── arena.gd         # THE core script: builds polygon, walls, zones, paddles,
+│   │                    #   spawning, modifiers, lives/collapse, round lifecycle
+│   └── department_zone.gd  # ColourZone Area2D: catch detection, score_up/score_down/wrong_catch signals
+├── ticket/ticket.gd     # Ball (RigidBody2D): size/speed, splits, on-hit power-ups
+├── paddle/
+│   ├── paddle.gd        # Base CharacterBody2D: slide axis, collision shape, deflector triangle
+│   ├── player_paddle.gd # Input + hold-key power-ups
+│   └── ai_paddle.gd     # Threat targeting + per-colour personality
+├── resources/department_data.gd  # ColourData: colours, names, enum
+└── ui/                  # One script per screen; all custom-drawn (see UI conventions)
 ```
 
 ---
@@ -179,32 +131,18 @@ Misdirect/
 # Run the game
 "C:\Users\jamie\OneDrive - Blakeman Online\Desktop\Godot\Godot_v4.5.1-stable_win64.exe" --path .
 
-# Validate a script
+# Validate a script (NOTE: autoload references produce FALSE-POSITIVE
+# "Identifier not found" errors under --check-only — ignore those; only
+# genuine syntax/indentation errors matter)
 "C:\Users\jamie\OneDrive - Blakeman Online\Desktop\Godot\Godot_v4.5.1-stable_win64.exe" --path . --check-only --script scripts/example.gd
 
-# Run headless
-"C:\Users\jamie\OneDrive - Blakeman Online\Desktop\Godot\Godot_v4.5.1-stable_win64.exe" --path . --headless
-
-# Debug collisions (useful for paddle/ticket hitbox tuning)
+# Debug collisions
 "C:\Users\jamie\OneDrive - Blakeman Online\Desktop\Godot\Godot_v4.5.1-stable_win64.exe" --path . --debug-collisions
 ```
 
 ### Git Workflow
 - Commit directly to `main`
 - Use conventional commits: `feat:`, `fix:`, `refactor:`
-
-### Build Priority Order
-Build in this order to keep a playable state at all times:
-1. Arena boundaries + single bouncing ticket
-2. Department zones + paddle collision
-3. Player-controlled paddle
-4. Zone catching + queue display
-5. Ticket colour matching + wrong catch penalty chain
-6. AI department paddles with basic personalities
-7. Multiple ticket types with behaviours
-8. Scoring + SLA timers
-9. Win/lose conditions + round flow
-10. Sound, juice, polish
 
 ---
 
@@ -214,76 +152,70 @@ Build in this order to keep a playable state at all times:
 ```gdscript
 # Use typed variables
 var speed: float = 300.0
-var department_colour: Color = Color.BLUE
 
 # Type function parameters and returns
-func catch_ticket(ticket: Ticket) -> void:
-    if ticket.department_type == self.department_type:
-        score_manager.add_correct_catch(ticket)
-    else:
-        score_manager.apply_wrong_catch_penalty(ticket, self)
+func catch_ball(ball: Ball) -> void:
+    ...
 
-# Use @export for tunable properties (keeps things tweakable in editor)
+# Use @export for tunable properties
 @export var paddle_speed: float = 400.0
-@export var queue_resolve_time: float = 3.0  # seconds per ticket
 
 # Use @onready for node references
 @onready var collision: CollisionShape2D = $CollisionShape2D
 
 # Signals use past tense
-signal ticket_caught(ticket: Ticket)
-signal queue_overflowed
+signal ticket_caught(ball: Ball)
 ```
 
-### Department Type Enum
-Always use the shared enum for department identity:
-```gdscript
-enum DepartmentType {
-    SERVICE_DESK,
-    INFRASTRUCTURE,
-    SECURITY,
-    DEVELOPMENT,
-    MANAGEMENT
-}
-```
-
-### Ticket State Machine
-Tickets should always be in one of these states:
-```gdscript
-enum TicketState {
-    IN_PLAY,      # Bouncing around the arena
-    CAUGHT,       # Held in a department queue
-    REASSIGNED,   # Batted back out after wrong catch
-    RESOLVED,     # Cleared from queue, award points
-    ESCALATED     # Split state triggered
-}
-```
+### UI Conventions (important — all screens follow this pattern)
+- Screens are `Node2D` (overlays are `Control`/`Node2D`) drawn **entirely in
+  `_draw()`** — no Control-based layouts. Text via
+  `draw_string(FontManager.get_font(), ...)`.
+- Mouse hit-testing: build `Rect2`s during `_draw()`, test them in
+  `_unhandled_input`. Buttons play `AudioManager.play_button_hover()/click()`.
+- Every screen supports both mouse and keyboard (arrows + `ui_accept`/`ui_cancel`).
+- `CornerHUD.draw_on(self)` at the end of menu screens draws the profile/level/token box.
 
 ---
 
 ## Known Patterns & Gotchas
 
+### Coordinates & Scaling
+- Stretch mode is `canvas_items` + `expand` (base 1280×720). At non-1× window
+  scale, **`event.position` (window px) ≠ canvas coordinates**. For hit-testing
+  against rects computed in `_draw()`, use `get_global_mouse_position()` —
+  this bug has bitten pause_menu and settings_screen before.
+- **Portrait mode**: arena.gd scales the polygon to fill the canvas width and
+  stores `_arena_scale` (~2.1× on phone portrait). Every size/speed/force
+  constant used in the arena must be multiplied by `_arena_scale` (balls take it
+  via their `arena_scale` property). When adding arena features, scale them.
+- Do **not** add a Camera2D to the arena — a previous one at (640,360) broke
+  portrait layouts and was removed deliberately.
+
+### Pause & Scene Lifecycle
+- `SceneTree.paused` persists across `reload_current_scene()` / scene changes —
+  always `get_tree().paused = false` before reloading or leaving.
+- game_over_screen and pause overlays use `PROCESS_MODE_ALWAYS`; the arena pauses
+  the tree when results show.
+- Closing settings mid-game reloads the arena scene (physics nodes can't be
+  repositioned safely after a resolution change) — this restarts the round.
+
 ### Physics
-- Use `CharacterBody2D` for paddles (direct movement control)
-- Use `RigidBody2D` for tickets (physics-driven bouncing)
-- Set `physics_material_override` on tickets for bounciness — bounce = 1.0, friction = 0.0
-- Speed cap tickets via `linear_velocity = linear_velocity.normalized() * max_speed` in `_physics_process` to prevent runaway acceleration
+- Paddles: `CharacterBody2D`, moved along a slide axis (`move_direction`,
+  `min_offset`/`max_offset` from `zone_centre`); rotation orients them to their edge.
+  Arena sets all movement properties **before** `add_child()` so `_ready()` has them.
+- Balls: `RigidBody2D` with bounce 1.0 / friction 0.0 material; speed clamped every
+  physics frame between size-scaled min/max.
+- Zones: `Area2D` outside the polygon edge (the wall is omitted on zone sides);
+  `body_entered` = caught. Walls: `StaticBody2D` rectangles per polygon edge.
+- Ball splits: arena's `_on_ball_split` frees the original and spawns children with
+  divergent velocities; split children can't re-split (`can_split`).
 
-### Arena Boundaries
-- Use `StaticBody2D` with `CollisionShape2D` segments for walls
-- Department zones are `Area2D` nodes — use `body_entered` signal to detect tickets entering the zone
-- When a ticket enters a zone, it is automatically caught by that department (no manual catch action needed)
-
-### AI Paddle Behaviour
-- AI paddles use a simple target-following approach: lerp toward the ticket's predicted X/Y position
-- Each personality has a `reaction_delay: float` and `accuracy: float` (0.0–1.0) to simulate mistakes
-- Management AI has a very high `reaction_delay` and low `accuracy` by design
-
-### Splittig Tickets
-- When a ticket splits, free the original and spawn two new tickets from `TicketManager`
-- Apply slightly divergent velocities (e.g. ±30 degrees from original direction)
-- Preserve the original department colour and type on children
+### Persistence
+- Everything saves through `ConfigFile` under `user://` — settings are
+  device-level; stats are per-profile (`user://profiles/<id>/stats.cfg`).
+- When adding a stat: add the var, default it in `load_stats()`, read it there,
+  write it in `save_stats()`, and update it in `record_game_end()` if per-game.
 
 ### Performance
-- Pool tickets rather than instancing/freeing repeatedly — use a `TicketPool` in `TicketManager`
-- Cap maximum simultaneous tickets at 12 to prevent chaos beyond playability
+- Balls capped via `max_balls` (default 10) checked in `_try_spawn_ball()`.
