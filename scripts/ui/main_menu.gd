@@ -134,7 +134,7 @@ func _draw_background() -> void:
 	for i in range(dec_points.size()):
 		draw_line(dec_points[i], dec_points[(i + 1) % dec_points.size()], dec_color, 1.5)
 
-	# Subtle coloured corner accents matching department colours
+	# Subtle coloured corner accents matching zone colours
 	var corner_alpha: float = 0.12
 	draw_circle(Vector2(0, 0), 200, Color(Color.DODGER_BLUE, corner_alpha))
 	draw_circle(Vector2(sw, 0), 200, Color(Color.CRIMSON, corner_alpha))

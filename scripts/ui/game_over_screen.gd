@@ -2,7 +2,7 @@ extends Control
 class_name GameOverScreen
 ## Game over overlay showing results
 
-const ColourData = preload("res://scripts/resources/department_data.gd")
+const ColourData = preload("res://scripts/resources/colour_data.gd")
 const CornerHUD  = preload("res://scripts/ui/corner_hud.gd")
 
 signal restart_requested

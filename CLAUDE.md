@@ -34,7 +34,7 @@ The player always controls the **GREEN** paddle on the bottom edge (side 0). All
 other zones are AI-controlled paddles with per-colour personalities.
 
 ### Colours
-Defined in `scripts/resources/department_data.gd` (`ColourData`, `ColourType` enum):
+Defined in `scripts/resources/colour_data.gd` (`ColourData`, `ColourType` enum):
 BLUE, GREEN, RED, YELLOW, PURPLE, ORANGE, CYAN, PINK. Up to 8 players/zones.
 
 AI personalities live in `ai_paddle.gd::_apply_personality()` — each colour has its
@@ -60,7 +60,7 @@ Lives are drawn as dots near each score display (`_draw_lives` in arena.gd).
 - Every catch destroys the ball by default. With the **return_to_sender**
   modifier, wrong catches instead apply the penalty chain
   (`apply_wrong_catch_penalty`: speed-up, then blame stamp) and reflect the
-  ball back into the arena (`_bounce_back` in department_zone.gd).
+  ball back into the arena (`_bounce_back` in colour_zone.gd).
 
 ### Maps & Player Counts
 `GameConfig.MAP_VALID_PLAYERS` / `MAP_ZONE_SIDES` define which polygon sides are
@@ -73,12 +73,12 @@ heptagon, octagon. Maps unlock via wins on the previous map
   assigned to up to 3 slots pre-game (`power_up_slots`). Slots unlock by level +
   token fee (`POWER_UP_SLOT_DEFS`; keys SPACE/Q/E). Hold-key power-ups (gravity,
   anti_gravity, cyclone) are handled in `player_paddle.gd`; on-hit power-ups
-  (railgun, splits, deflector) in `ticket.gd` / `paddle.gd`.
+  (railgun, splits, deflector) in `ball.gd` / `paddle.gd`.
 - **Modifiers** (`GameConfig.MODIFIERS`) are free toggles unlocked by level:
   rotated_colours, chaos_ball, load_balanced, random_directions, extra_time,
   final_countdown, return_to_sender, speed_ball, black_hole, gravity_wells,
   pillars. Implemented in arena.gd (spawn logic, `_tick_black_hole`,
-  `_tick_gravity_well`, pillars) and department_zone.gd (return_to_sender).
+  `_tick_gravity_well`, pillars) and colour_zone.gd (return_to_sender).
 
 ---
 
@@ -95,10 +95,6 @@ heptagon, octagon. Maps unlock via wins on the previous map
 | `FontManager`     | Serves the accessibility font (`get_font()`); all UI uses this instead of ThemeDB. |
 | `StatsManager`    | Per-profile lifetime stats (per-mode high scores/game counts, wins/draws/losses, tokens + total earned, XP/level, unlocks). Persists via ConfigFile per profile. |
 
-Note: `scripts/autoload/score_manager.gd`, `scripts/ui/queue_display.gd`,
-`scripts/resources/ticket_data.gd` are **legacy from the original ticket/SLA
-design and are not registered or used**.
-
 ### Scene Flow
 ```
 main_menu → mode_select → map_select → pre_game_config → arena
@@ -112,17 +108,17 @@ First run with no profiles jumps straight to profile_setup.
 ### Key Scripts
 ```
 scripts/
-├── autoload/            # See table above (+ legacy score_manager.gd)
+├── autoload/            # See table above
 ├── arena/
 │   ├── arena.gd         # THE core script: builds polygon, walls, zones, paddles,
 │   │                    #   spawning, modifiers, lives/collapse, round lifecycle
-│   └── department_zone.gd  # ColourZone Area2D: catch detection, score_up/score_down/wrong_catch signals
-├── ticket/ticket.gd     # Ball (RigidBody2D): size/speed, splits, on-hit power-ups
+│   └── colour_zone.gd   # ColourZone Area2D: catch detection, score_up/score_down/wrong_catch signals
+├── ball/ball.gd         # Ball (RigidBody2D): size/speed, splits, on-hit power-ups
 ├── paddle/
 │   ├── paddle.gd        # Base CharacterBody2D: slide axis, collision shape, deflector triangle
 │   ├── player_paddle.gd # Input + hold-key power-ups
 │   └── ai_paddle.gd     # Threat targeting + per-colour personality
-├── resources/department_data.gd  # ColourData: colours, names, enum
+├── resources/colour_data.gd  # ColourData: colours, names, enum
 └── ui/                  # One script per screen; all custom-drawn (see UI conventions)
 ```
 
@@ -168,7 +164,7 @@ func catch_ball(ball: Ball) -> void:
 @onready var collision: CollisionShape2D = $CollisionShape2D
 
 # Signals use past tense
-signal ticket_caught(ball: Ball)
+signal ball_caught(ball: Ball)
 ```
 
 ### UI Conventions (important — all screens follow this pattern)

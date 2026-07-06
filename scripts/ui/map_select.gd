@@ -3,7 +3,7 @@ extends Node2D
 ## Inserted between the main menu PLAY button and pre_game_config.
 ## All drawing via _draw() — no Control nodes.
 
-const ColourData = preload("res://scripts/resources/department_data.gd")
+const ColourData = preload("res://scripts/resources/colour_data.gd")
 const CornerHUD  = preload("res://scripts/ui/corner_hud.gd")
 
 # ── Layout constants ───────────────────────────────────────────────────────────

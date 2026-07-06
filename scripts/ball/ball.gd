@@ -2,7 +2,7 @@ extends RigidBody2D
 class_name Ball
 ## Ball - A bouncing ball in the arena
 
-const ColourData = preload("res://scripts/resources/department_data.gd")
+const ColourData = preload("res://scripts/resources/colour_data.gd")
 
 ## spread_angle: half-angle (radians) of velocity divergence between split children.
 ## Use a small value (e.g. 0.05) for near-identical clones, PI/5 for wide splits.

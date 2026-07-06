@@ -2,7 +2,7 @@ extends Control
 class_name ScoreDisplay
 ## Displays the score for a colour zone
 
-const ColourData = preload("res://scripts/resources/department_data.gd")
+const ColourData = preload("res://scripts/resources/colour_data.gd")
 
 @export_enum("BLUE", "GREEN", "RED", "YELLOW", "PURPLE") var colour_type: int = 0
 @export var is_player: bool = false

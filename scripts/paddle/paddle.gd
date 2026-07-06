@@ -5,7 +5,7 @@ class_name Paddle
 ## arena.gd sets `rotation` on the node to orient it along its zone edge,
 ## and sets the movement properties before add_child() so _ready() has them.
 
-const ColourData = preload("res://scripts/resources/department_data.gd")
+const ColourData = preload("res://scripts/resources/colour_data.gd")
 
 @export_enum("BLUE", "GREEN", "RED", "YELLOW", "PURPLE", "ORANGE", "CYAN", "PINK") var colour_type: int = 0
 @export var paddle_length: float = 100.0

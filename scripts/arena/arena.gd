@@ -3,7 +3,7 @@ extends Node2D
 ## Polygon vertices are defined clockwise starting from the bottom-left of the player's
 ## side (side 0). Zone / paddle positions are computed from the polygon geometry at runtime.
 
-const ColourData = preload("res://scripts/resources/department_data.gd")
+const ColourData = preload("res://scripts/resources/colour_data.gd")
 
 const ARENA_WIDTH:  float = 1280.0
 const ARENA_HEIGHT: float = 720.0
@@ -29,8 +29,8 @@ const SLOT_COLOURS: Array = [
 @export var max_balls: int = 10
 @export var round_duration: float = 120.0
 
-var ball_scene:        PackedScene = preload("res://scenes/components/ticket.tscn")
-var zone_scene:          PackedScene = preload("res://scenes/components/department_zone.tscn")
+var ball_scene:        PackedScene = preload("res://scenes/components/ball.tscn")
+var zone_scene:          PackedScene = preload("res://scenes/components/colour_zone.tscn")
 var paddle_scene:        PackedScene = preload("res://scenes/components/paddle.tscn")
 var player_paddle_scene: PackedScene = preload("res://scenes/components/player_paddle.tscn")
 var ai_paddle_scene:     PackedScene = preload("res://scenes/components/ai_paddle.tscn")

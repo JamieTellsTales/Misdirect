@@ -3,7 +3,7 @@ class_name ColourZone
 ## A zone at the edge of the arena belonging to a colour
 ## Balls entering this zone score points (correct colour) or lose points (wrong colour)
 
-const ColourData = preload("res://scripts/resources/department_data.gd")
+const ColourData = preload("res://scripts/resources/colour_data.gd")
 
 signal score_up(colour_type: int, points: int)
 signal score_down(colour_type: int, points: int)
