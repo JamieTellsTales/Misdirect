@@ -33,6 +33,45 @@ var _sel_row:    int = 0        # keyboard-selected zone row
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	_dedupe_colours()
+
+
+func _dedupe_colours() -> void:
+	## Enforce one-colour-per-zone: if any palette colour is assigned to more than
+	## one zone (e.g. from older saves), keep the first in display order and reset
+	## the rest to their default.
+	var seen: Dictionary = {}
+	var changed: bool = false
+	for ct in ZONE_ORDER:
+		var idx: int = SettingsManager.get_zone_colour_index(ct)
+		if idx < 0:
+			continue
+		if seen.has(idx):
+			SettingsManager.zone_colours.erase(ct)
+			changed = true
+		else:
+			seen[idx] = ct
+	if changed:
+		SettingsManager.save_settings()
+
+
+func _colour_owner(palette_index: int) -> int:
+	## The ColourType currently using this palette index, or -1 if unused.
+	for key in SettingsManager.zone_colours:
+		if int(SettingsManager.zone_colours[key]) == palette_index:
+			return int(key)
+	return -1
+
+
+func _available_options(ct: int) -> Array:
+	## Options this zone may cycle to: Default plus palette colours not taken by
+	## another zone.
+	var out: Array = [-1]
+	for i in range(ColourData.ACCESSIBLE_PALETTE.size()):
+		var owner: int = _colour_owner(i)
+		if owner == -1 or owner == ct:
+			out.append(i)
+	return out
 
 
 func _process(_delta: float) -> void:
@@ -61,11 +100,14 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _cycle_row(row: int, dir: int) -> void:
-	## Cycle a zone's choice through [Default, palette 0..N-1].
+	## Cycle a zone through its available options (Default + colours not taken).
 	var ct: int = ZONE_ORDER[row]
-	var n: int = ColourData.ACCESSIBLE_PALETTE.size()
-	var cur: int = SettingsManager.get_zone_colour_index(ct)   # -1..n-1
-	var next: int = wrapi(cur + 1 + dir, 0, n + 1) - 1          # keep in [-1, n-1]
+	var opts: Array = _available_options(ct)
+	var cur: int = SettingsManager.get_zone_colour_index(ct)
+	var pos: int = opts.find(cur)
+	if pos == -1:
+		pos = 0
+	var next: int = opts[wrapi(pos + dir, 0, opts.size())]
 	SettingsManager.set_zone_colour_index(ct, next)
 	AudioManager.play_button_click()
 
@@ -122,7 +164,7 @@ func _draw() -> void:
 	draw_string(font, Vector2(cx - tw / 2.0 + 2, 68), title, HORIZONTAL_ALIGNMENT_LEFT, -1, tsz, Color(0, 0, 0, 0.5))
 	draw_string(font, Vector2(cx - tw / 2.0, 66), title, HORIZONTAL_ALIGNMENT_LEFT, -1, tsz, Color.WHITE)
 
-	var sub := "Pick a colour for each zone — your zone is highlighted. Colours apply on your next game."
+	var sub := "Pick a colour for each player — each colour can only be used once. Applies on your next game."
 	var ssz: int = 15
 	var sub_w := font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, ssz).x
 	draw_string(font, Vector2(cx - sub_w / 2.0, 98), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, ssz, Color(0.6, 0.7, 0.8, 1.0))
@@ -132,6 +174,13 @@ func _draw() -> void:
 	var dot_x: float     = cx - 470.0
 	var label_x: float   = cx - 440.0
 	var swatch_x0: float = cx + 470.0 - block_w   # right-aligned block
+
+	# Which palette index is currently taken by which zone (for uniqueness).
+	var used_by: Dictionary = {}
+	for uz in ZONE_ORDER:
+		var ui: int = SettingsManager.get_zone_colour_index(uz)
+		if ui >= 0:
+			used_by[ui] = uz
 
 	for row in ZONE_ORDER.size():
 		var ct: int = ZONE_ORDER[row]
@@ -149,8 +198,8 @@ func _draw() -> void:
 		draw_circle(Vector2(dot_x, row_y), 10.0, eff, true, -1.0, true)
 		draw_arc(Vector2(dot_x, row_y), 10.0, 0, TAU, 24, eff.lightened(0.3), 1.5, true)
 
-		# Zone label
-		var label: String = ColourData.get_colour_name(ct)
+		# Zone label — Player 1 (You), Player 2, …
+		var label: String = "Player %d" % (row + 1)
 		if is_player:
 			label += "  (You)"
 		draw_string(font, Vector2(label_x, row_y + 6.0), label,
@@ -163,10 +212,10 @@ func _draw() -> void:
 			var slot: int = opt + 1
 			var sx: float = swatch_x0 + slot * (SWATCH_SIZE + SWATCH_GAP)
 			var rect := Rect2(sx, row_y - SWATCH_SIZE / 2.0, SWATCH_SIZE, SWATCH_SIZE)
-			_swatch_rects.append({"rect": rect, "ct": ct, "index": opt})
 
 			var selected: bool = cur_idx == opt
-			var hovered: bool = _hover_key == "sw_%d_%d" % [ct, opt]
+			# A palette colour used by a DIFFERENT player can't be picked here.
+			var taken_other: bool = opt >= 0 and used_by.get(opt, ct) != ct
 
 			if opt == -1:
 				# Default swatch — show the zone's default colour with a "D" marker
@@ -174,16 +223,30 @@ func _draw() -> void:
 				draw_rect(rect, Color(dcol.r, dcol.g, dcol.b, 0.85))
 				draw_string(font, Vector2(sx + 9.0, row_y + 5.0), "D",
 					HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0, 0, 0, 0.6))
+			elif taken_other:
+				# Greyed with an ✕ — taken by another player.
+				var pc: Color = ColourData.ACCESSIBLE_PALETTE[opt]["color"]
+				draw_rect(rect, Color(pc.r, pc.g, pc.b, 0.20))
+				var m: float = 8.0
+				draw_line(rect.position + Vector2(m, m), rect.position + Vector2(SWATCH_SIZE - m, SWATCH_SIZE - m), Color(0.7, 0.7, 0.75, 0.7), 1.5, true)
+				draw_line(rect.position + Vector2(SWATCH_SIZE - m, m), rect.position + Vector2(m, SWATCH_SIZE - m), Color(0.7, 0.7, 0.75, 0.7), 1.5, true)
 			else:
 				draw_rect(rect, ColourData.ACCESSIBLE_PALETTE[opt]["color"])
 
-			# Border: bright + thick if selected, lighter on hover
+			var hovered: bool = _hover_key == "sw_%d_%d" % [ct, opt]
+			# Border: bright + thick if selected, dim if taken, lighter on hover
 			if selected:
 				draw_rect(rect, Color(1, 1, 1, 0.95), false, 2.5)
+			elif taken_other:
+				draw_rect(rect, Color(0.3, 0.3, 0.36, 0.6), false, 1.0)
 			elif hovered:
 				draw_rect(rect, Color(0.85, 0.85, 0.95, 0.8), false, 2.0)
 			else:
 				draw_rect(rect, Color(0, 0, 0, 0.5), false, 1.0)
+
+			# Only selectable swatches are clickable / hoverable.
+			if not taken_other:
+				_swatch_rects.append({"rect": rect, "ct": ct, "index": opt})
 
 	# "Default" column caption
 	draw_string(font, Vector2(swatch_x0 + 2.0, ROW_START_Y - 22.0), "default",
