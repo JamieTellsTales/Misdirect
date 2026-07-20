@@ -16,6 +16,9 @@ var cyclone_active:      bool = false
 func _ready() -> void:
 	super._ready()
 	add_to_group("player_paddle")
+	# Hyper Paddle (passive): double movement speed.
+	if GameConfig.has_power_up_in_slot("hyper_paddle"):
+		move_speed *= 2.0
 
 
 func _physics_process(_delta: float) -> void:

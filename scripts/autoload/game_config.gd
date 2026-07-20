@@ -69,6 +69,13 @@ const POWER_UPS: Array = [
 		"price": 75,
 		"kind": "passive",
 	},
+	{
+		"id": "hyper_paddle",
+		"label": "Hyper Paddle",
+		"desc": "Doubles your paddle's movement speed",
+		"price": 125,
+		"kind": "passive",
+	},
 ]
 
 ## Canonical list of all modifiers. Add entries here to extend the pre-game screen.
