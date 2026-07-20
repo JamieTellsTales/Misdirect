@@ -45,6 +45,12 @@ var _surge_timer:   float = 0.0
 const TRAIL_LEN: int = 9
 var _trail: PackedVector2Array = PackedVector2Array()
 
+# Railgun launch — a temporary speed-cap boost that decays back to normal so
+# the clamp doesn't kill the launch on the next physics frame.
+const RAILGUN_MULT: float = 1.8
+const LAUNCH_DECAY: float = 1.2   # boost units lost per second
+var _launch_boost: float = 0.0    # extra multiplier above 1.0 on the speed cap
+
 
 func _ready() -> void:
 	add_to_group("balls")
@@ -87,6 +93,8 @@ func _update_collision_shape() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if _launch_boost > 0.0:
+		_launch_boost = maxf(0.0, _launch_boost - LAUNCH_DECAY * delta)
 	_clamp_speed()
 	if split_cooldown > 0:
 		split_cooldown -= delta
@@ -114,7 +122,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _clamp_speed() -> void:
-	var effective_max: float = max_speed * speed_multiplier
+	var effective_max: float = max_speed * speed_multiplier * (1.0 + _launch_boost)
 	var effective_min: float = min_speed * speed_multiplier
 	var speed: float = linear_velocity.length()
 
@@ -132,9 +140,11 @@ func _on_body_entered(body: Node) -> void:
 
 		if body.is_in_group("player_paddle"):
 			# ── Railgun: blast the ball out at high speed ─────────────────
+			# Deferred so it fires AFTER the physics engine resolves the bounce
+			# (velocity then points away from the paddle, not into the zone) and
+			# isn't overwritten by the collision solver.
 			if GameConfig.has_power_up_in_slot("railgun"):
-				var boosted_speed: float = max_speed * speed_multiplier * 1.8
-				linear_velocity = linear_velocity.normalized() * boosted_speed
+				call_deferred("_fire_railgun")
 
 			# ── Split power-ups ───────────────────────────────────────────
 			if can_split and split_cooldown <= 0.0:
@@ -151,6 +161,16 @@ func _on_body_entered(body: Node) -> void:
 				elif GameConfig.has_power_up_in_slot("double_rebound"):
 					split_cooldown = 0.5
 					request_split.emit(self, 2, PI / 5.0)
+
+
+func _fire_railgun() -> void:
+	## Launch the ball at high speed along its post-bounce direction. The launch
+	## boost raises the speed cap and decays, so _clamp_speed lets it ride out.
+	var dir: Vector2 = linear_velocity.normalized()
+	if dir == Vector2.ZERO:
+		return
+	_launch_boost = RAILGUN_MULT - 1.0
+	linear_velocity = dir * max_speed * speed_multiplier * RAILGUN_MULT
 
 
 func _draw() -> void:
