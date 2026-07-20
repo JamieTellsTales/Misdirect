@@ -61,3 +61,40 @@ static func get_default_color(colour: int) -> Color:
 
 static func get_colour_name(colour: int) -> String:
 	return COLOUR_NAMES.get(colour, "Unknown")
+
+
+static func draw_symbol(ci: CanvasItem, colour: int, center: Vector2, r: float, col: Color) -> void:
+	## Draw a distinct symbol per colour (accessibility — identify a zone/ball
+	## without relying on colour). Used by balls and zones when "Ball symbols" is on.
+	match colour:
+		ColourType.BLUE:    # ring
+			ci.draw_arc(center, r * 0.82, 0, TAU, 28, col, maxf(2.0, r * 0.34), true)
+		ColourType.GREEN:   # triangle
+			ci.draw_colored_polygon(PackedVector2Array([
+				center + Vector2(0.0, -r), center + Vector2(r * 0.92, r * 0.72), center + Vector2(-r * 0.92, r * 0.72)]), col)
+		ColourType.RED:     # square
+			ci.draw_rect(Rect2(center - Vector2(r * 0.74, r * 0.74), Vector2(r * 1.48, r * 1.48)), col)
+		ColourType.YELLOW:  # diamond
+			ci.draw_colored_polygon(PackedVector2Array([
+				center + Vector2(0.0, -r), center + Vector2(r, 0.0), center + Vector2(0.0, r), center + Vector2(-r, 0.0)]), col)
+		ColourType.PURPLE:  # plus
+			var t: float = r * 0.34
+			ci.draw_rect(Rect2(center - Vector2(t, r * 0.85), Vector2(t * 2.0, r * 1.7)), col)
+			ci.draw_rect(Rect2(center - Vector2(r * 0.85, t), Vector2(r * 1.7, t * 2.0)), col)
+		ColourType.ORANGE:  # cross (X)
+			var w: float = maxf(2.0, r * 0.32)
+			ci.draw_line(center + Vector2(-r * 0.7, -r * 0.7), center + Vector2(r * 0.7, r * 0.7), col, w, true)
+			ci.draw_line(center + Vector2(r * 0.7, -r * 0.7), center + Vector2(-r * 0.7, r * 0.7), col, w, true)
+		ColourType.CYAN:    # hexagon
+			var hex := PackedVector2Array()
+			for i in 6:
+				hex.append(center + Vector2.from_angle(PI / 6.0 + i * PI / 3.0) * r)
+			ci.draw_colored_polygon(hex, col)
+		ColourType.PINK:    # 5-point star
+			var star := PackedVector2Array()
+			for i in 10:
+				var rr: float = r if i % 2 == 0 else r * 0.45
+				star.append(center + Vector2.from_angle(-PI / 2.0 + i * PI / 5.0) * rr)
+			ci.draw_colored_polygon(star, col)
+		_:
+			ci.draw_circle(center, r * 0.6, col)

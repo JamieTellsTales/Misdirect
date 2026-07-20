@@ -19,16 +19,23 @@ const ZONE_ORDER: Array = [
 	ColourData.ColourType.PINK,
 ]
 
-const ROW_START_Y: float = 158.0
-const ROW_H:       float = 52.0
+const ROW_START_Y: float = 144.0
+const ROW_H:       float = 44.0
 const SWATCH_SIZE: float = 30.0
 const SWATCH_GAP:  float = 7.0
 
+## Accessibility toggles shown below the colour grid.
+const TOGGLES: Array = [
+	{"label": "Reduced motion", "desc": "No screen shake, hit-stop, trails or flashing"},
+	{"label": "Ball symbols",   "desc": "A distinct shape per colour on balls & zones"},
+]
+
 var _swatch_rects: Array = []   # [{rect, ct, index}]  index -1 = Default
+var _toggle_rects: Array = []   # [{rect, idx}]
 var _back_rect:  Rect2 = Rect2()
 var _reset_rect: Rect2 = Rect2()
 var _hover_key:  String = ""
-var _sel_row:    int = 0        # keyboard-selected zone row
+var _sel_row:    int = 0        # keyboard cursor: 0..7 zones, then toggles
 
 
 func _ready() -> void:
@@ -85,18 +92,40 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_handle_click(get_global_mouse_position())
 
+	var total: int = ZONE_ORDER.size() + TOGGLES.size()
 	if event.is_action_pressed("ui_cancel"):
 		_go_back()
 	elif event.is_action_pressed("ui_down") or event.is_action_pressed("move_down"):
-		_sel_row = (_sel_row + 1) % ZONE_ORDER.size()
+		_sel_row = (_sel_row + 1) % total
 		AudioManager.play_button_hover()
 	elif event.is_action_pressed("ui_up") or event.is_action_pressed("move_up"):
-		_sel_row = (_sel_row - 1 + ZONE_ORDER.size()) % ZONE_ORDER.size()
+		_sel_row = (_sel_row - 1 + total) % total
 		AudioManager.play_button_hover()
 	elif event.is_action_pressed("ui_right") or event.is_action_pressed("move_right"):
-		_cycle_row(_sel_row, 1)
+		if _sel_row < ZONE_ORDER.size():
+			_cycle_row(_sel_row, 1)
+		else:
+			_toggle_setting(_sel_row - ZONE_ORDER.size())
 	elif event.is_action_pressed("ui_left") or event.is_action_pressed("move_left"):
-		_cycle_row(_sel_row, -1)
+		if _sel_row < ZONE_ORDER.size():
+			_cycle_row(_sel_row, -1)
+		else:
+			_toggle_setting(_sel_row - ZONE_ORDER.size())
+	elif event.is_action_pressed("ui_accept") and _sel_row >= ZONE_ORDER.size():
+		_toggle_setting(_sel_row - ZONE_ORDER.size())
+
+
+func _toggle_value(idx: int) -> bool:
+	return SettingsManager.reduced_motion if idx == 0 else SettingsManager.ball_symbols
+
+
+func _toggle_setting(idx: int) -> void:
+	if idx == 0:
+		SettingsManager.reduced_motion = not SettingsManager.reduced_motion
+	elif idx == 1:
+		SettingsManager.ball_symbols = not SettingsManager.ball_symbols
+	SettingsManager.save_settings()
+	AudioManager.play_button_click()
 
 
 func _cycle_row(row: int, dir: int) -> void:
@@ -123,6 +152,11 @@ func _update_hover(pos: Vector2) -> void:
 			if e.rect.has_point(pos):
 				new_key = "sw_%d_%d" % [e.ct, e.index]
 				break
+		if new_key == "":
+			for e in _toggle_rects:
+				if e.rect.has_point(pos):
+					new_key = "tog_%d" % e.idx
+					break
 	if new_key != _hover_key and new_key != "":
 		AudioManager.play_button_hover()
 	_hover_key = new_key
@@ -141,6 +175,10 @@ func _handle_click(pos: Vector2) -> void:
 			AudioManager.play_button_click()
 			SettingsManager.set_zone_colour_index(e.ct, e.index)
 			return
+	for e in _toggle_rects:
+		if e.rect.has_point(pos):
+			_toggle_setting(e.idx)
+			return
 
 
 func _go_back() -> void:
@@ -154,6 +192,7 @@ func _draw() -> void:
 	var sh: float = get_viewport_rect().size.y
 	var cx: float = sw / 2.0
 	_swatch_rects.clear()
+	_toggle_rects.clear()
 
 	draw_rect(Rect2(Vector2.ZERO, Vector2(sw, sh)), Color(0.07, 0.07, 0.12, 1.0))
 
@@ -252,8 +291,45 @@ func _draw() -> void:
 	draw_string(font, Vector2(swatch_x0 + 2.0, ROW_START_Y - 22.0), "default",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.5, 0.5, 0.6, 1.0))
 
+	# ── Accessibility toggles ─────────────────────────────────────────────────
+	var tog_y0: float = ROW_START_Y + ZONE_ORDER.size() * ROW_H + 6.0
+	draw_line(Vector2(dot_x - 16.0, tog_y0 - 12.0), Vector2(cx + 470.0, tog_y0 - 12.0),
+		Color(0.3, 0.3, 0.4, 0.4), 1.0)
+	for ti in TOGGLES.size():
+		var ty: float = tog_y0 + 14.0 + ti * ROW_H
+		var is_tsel: bool = _sel_row == ZONE_ORDER.size() + ti
+		if is_tsel:
+			draw_rect(Rect2(dot_x - 16.0, ty - ROW_H / 2.0 + 2.0, 970.0, ROW_H - 6.0),
+				Color(0.16, 0.18, 0.28, 0.7))
+		var on: bool = _toggle_value(ti)
+		draw_string(font, Vector2(label_x, ty - 2.0), TOGGLES[ti]["label"],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Color(0.85, 0.9, 1.0, 1.0))
+		draw_string(font, Vector2(label_x, ty + 15.0), TOGGLES[ti]["desc"],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.5, 0.55, 0.65, 1.0))
+
+		# ON / OFF pill (right side, aligned with swatch block)
+		var pill_w: float = 108.0
+		var pill_h: float = 30.0
+		var pill_x: float = cx + 470.0 - pill_w
+		var pill_rect := Rect2(pill_x, ty - pill_h / 2.0, pill_w, pill_h)
+		_toggle_rects.append({"rect": pill_rect, "idx": ti})
+		var hov: bool = _hover_key == "tog_%d" % ti
+		draw_rect(pill_rect, Color(0.14, 0.15, 0.22, 1.0))
+		draw_rect(pill_rect, Color(0.5, 0.6, 0.8, 0.7) if (hov or is_tsel) else Color(0.35, 0.35, 0.5, 0.6), false, 1.5)
+		var half: float = pill_w / 2.0
+		if on:
+			draw_rect(Rect2(pill_x + half, ty - pill_h / 2.0, half, pill_h), Color(0.12, 0.5, 0.2, 0.9))
+		else:
+			draw_rect(Rect2(pill_x, ty - pill_h / 2.0, half, pill_h), Color(0.3, 0.3, 0.4, 0.5))
+		var off_col: Color = Color(0.9, 0.9, 1.0, 1.0) if not on else Color(0.45, 0.45, 0.55, 1.0)
+		var on_col: Color  = Color(0.9, 1.0, 0.9, 1.0) if on else Color(0.45, 0.45, 0.55, 1.0)
+		draw_string(font, Vector2(pill_x + (half - font.get_string_size("OFF", HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x) / 2.0, ty + 5.0),
+			"OFF", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, off_col)
+		draw_string(font, Vector2(pill_x + half + (half - font.get_string_size("ON", HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x) / 2.0, ty + 5.0),
+			"ON", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, on_col)
+
 	# Buttons: Reset (left), Back (centre)
-	var btn_y: float = ROW_START_Y + ZONE_ORDER.size() * ROW_H + 18.0
+	var btn_y: float = tog_y0 + 14.0 + TOGGLES.size() * ROW_H + 8.0
 
 	var reset_lbl := "Reset to defaults"
 	var rsz: int = 16
@@ -269,12 +345,12 @@ func _draw() -> void:
 	var bsz: int = 18
 	var bw := font.get_string_size(back_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, bsz).x
 	var back_x := cx - bw / 2.0
-	var back_y := btn_y + 74.0
+	var back_y := btn_y + 62.0
 	_back_rect = Rect2(back_x - 16.0, back_y - bsz, bw + 32.0, bsz + 12.0)
 	draw_string(font, Vector2(back_x, back_y), back_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, bsz,
 		Color(0.6, 0.7, 0.9, 1.0) if _hover_key == "back" else Color(0.45, 0.55, 0.75, 1.0))
 
-	var hint := "↑ ↓  pick zone     ← →  change colour     click a swatch     ESC — back"
+	var hint := "↑ ↓  select     ← →  change     click to set     ESC — back"
 	var hsz: int = 13
 	var hw := font.get_string_size(hint, HORIZONTAL_ALIGNMENT_LEFT, -1, hsz).x
 	draw_string(font, Vector2(cx - hw / 2.0, sh - 22.0), hint,

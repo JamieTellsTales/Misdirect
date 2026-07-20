@@ -70,6 +70,13 @@ func _draw() -> void:
 		var outline := draw_vertices.duplicate()
 		outline.append(draw_vertices[0])
 		draw_polyline(outline, border_color, 3.0)
+		# Accessibility: the zone's identifying symbol at its centre.
+		if SettingsManager.ball_symbols:
+			var centroid: Vector2 = (draw_vertices[0] + draw_vertices[1] + draw_vertices[2] + draw_vertices[3]) / 4.0
+			var depth: float = draw_vertices[0].distance_to(draw_vertices[3])
+			var sym_col: Color = ColourData.get_color(colour_type)
+			sym_col.a = 0.9
+			ColourData.draw_symbol(self, colour_type, centroid, depth * 0.28, sym_col)
 	else:
 		# Fallback rect (used before set_draw_shape is called)
 		var col_shape := get_node_or_null("CollisionShape2D")

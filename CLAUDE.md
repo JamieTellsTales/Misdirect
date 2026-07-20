@@ -42,6 +42,10 @@ else the default — overrides are palette indices into
 device-level in `SettingsManager.zone_colours` and edited on the
 `colour_settings` screen (Settings → Colours & Accessibility). All UI/zones/
 balls resolve colour through `get_color`, so overrides apply on the next build.
+The colour screen enforces one colour per player and hosts the accessibility
+toggles `SettingsManager.reduced_motion` (gates shake/hit-stop/trails/flashing
+in arena.gd + ball.gd + round_timer_display.gd) and `ball_symbols` (draws
+`ColourData.draw_symbol` — a distinct shape per colour — on balls and zones).
 
 AI personalities live in `ai_paddle.gd::_apply_personality()` — each colour has its
 own `reaction_delay`, `accuracy`, `move_speed`, `prediction_strength`, plus quirks

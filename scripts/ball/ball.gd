@@ -209,11 +209,18 @@ func _draw() -> void:
 	var border_width: float = 2.0 + size_scale
 	draw_arc(Vector2.ZERO, radius, 0, TAU, 64, ball_color.lightened(0.3), border_width, true)
 
+	# Accessibility: a distinct symbol per colour, in a contrasting tone.
+	if SettingsManager.ball_symbols:
+		var sym_col: Color = Color(0.0, 0.0, 0.0, 0.85) if ball_color.get_luminance() > 0.5 else Color(1.0, 1.0, 1.0, 0.9)
+		ColourData.draw_symbol(self, colour_type, Vector2.ZERO, radius * 0.6, sym_col)
+
 
 func _draw_trail() -> void:
 	## Fading tail behind the ball — older samples are smaller and more transparent.
 	## Points are stored in global space; to_local keeps them world-aligned even
 	## if the body has rotated.
+	if SettingsManager.reduced_motion:
+		return
 	var n: int = _trail.size()
 	if n < 2:
 		return

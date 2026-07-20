@@ -216,6 +216,8 @@ func _tick_feedback(delta: float) -> void:
 
 func _add_shake(magnitude: float, duration: float) -> void:
 	## Trigger (or refresh, if stronger) a screen shake. Magnitude scales with arena.
+	if SettingsManager.reduced_motion:
+		return
 	var mag: float = magnitude * _arena_scale
 	if mag >= _shake_mag or _shake_time <= 0.0:
 		_shake_mag = mag
@@ -225,6 +227,8 @@ func _add_shake(magnitude: float, duration: float) -> void:
 
 func _trigger_hitstop(duration: float, scale: float) -> void:
 	## Briefly slow time for impact weight. Real-time; auto-resets in _tick_feedback.
+	if SettingsManager.reduced_motion:
+		return
 	Engine.time_scale = scale
 	_hitstop_time = duration
 

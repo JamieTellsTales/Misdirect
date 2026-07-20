@@ -52,6 +52,9 @@ var sfx_volume: float = 1.0
 # Accessibility: per-zone colour overrides. Maps ColourType (int) → index into
 # ColourData.ACCESSIBLE_PALETTE. Absent / -1 = use the zone's default colour.
 var zone_colours: Dictionary = {}
+# Accessibility toggles.
+var reduced_motion: bool = false  # Disable shake / hit-stop / trails / flashing
+var ball_symbols: bool = false    # Draw a distinct symbol per colour on balls & zones
 
 
 func _ready() -> void:
@@ -76,6 +79,8 @@ func load_settings() -> void:
 	music_volume     = config.get_value("audio",   "music_volume",      0.8)
 	sfx_volume       = config.get_value("audio",   "sfx_volume",        1.0)
 	zone_colours     = config.get_value("colours", "zone_colours",      {})
+	reduced_motion   = config.get_value("accessibility", "reduced_motion", false)
+	ball_symbols     = config.get_value("accessibility", "ball_symbols",   false)
 
 
 func save_settings() -> void:
@@ -88,6 +93,8 @@ func save_settings() -> void:
 	config.set_value("audio",   "music_volume",     music_volume)
 	config.set_value("audio",   "sfx_volume",       sfx_volume)
 	config.set_value("colours", "zone_colours",     zone_colours)
+	config.set_value("accessibility", "reduced_motion", reduced_motion)
+	config.set_value("accessibility", "ball_symbols",   ball_symbols)
 	config.save(CONFIG_PATH)
 
 
