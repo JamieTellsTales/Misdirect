@@ -871,22 +871,35 @@ func _do_ball_split(original: RigidBody2D, count: int, spread_angle: float) -> v
 
 	original.queue_free()
 
-	# Splits only trigger at the player's paddle (see ball.gd), which sits right
-	# in front of the player's zone. Aim children toward the arena centre so they
-	# fly back into play instead of immediately falling into the zone behind the
-	# paddle (which would catch several wrong-colour balls at once and end the run).
-	var centre: Vector2  = get_design_centre()
-	var inward: Vector2  = centre - pos
-	var base_angle: float = inward.angle() if inward.length() > 1.0 else vel.angle()
-	# Nudge the spawn point off the zone edge so children don't start inside it.
-	var spawn_pos: Vector2 = pos + inward.normalized() * 24.0 * _arena_scale
+	# Splits only trigger at the player's paddle (see ball.gd), which sits right in
+	# front of the player's zone. Two things stop a split from instantly draining
+	# the player's lives:
+	#   1. Children are aimed INTO the arena (opposite the player's zone normal).
+	#   2. Their spawn points are spread apart along the edge so they don't stack
+	#      on one point — overlapping RigidBodies get flung apart by depenetration,
+	#      which used to hurl several straight down into the player's own zone.
+	var centre: Vector2 = get_design_centre()
+	var player_out: Vector2 = _zone_outward_dirs.get(player_colour, (pos - centre))
+	player_out = player_out.normalized()
+	if player_out == Vector2.ZERO:
+		player_out = Vector2.DOWN
+	var inward: Vector2  = -player_out
+	var along: Vector2   = Vector2(-inward.y, inward.x)   # perpendicular = along the edge
+	var base_angle: float = inward.angle()
+
+	var child_sz: float     = max(0.4, sz * 0.75)
+	var child_radius: float = 16.0 * child_sz * _arena_scale
+	var spacing: float      = child_radius * 2.4
+	# Start a little inside the arena so nobody spawns touching the zone.
+	var base_pos: Vector2   = pos + inward * (24.0 * _arena_scale + child_radius)
 
 	for i in count:
 		var t: RigidBody2D = ball_scene.instantiate()
-		t.position    = spawn_pos
+		var lane: float = (float(i) - (count - 1) / 2.0) * spacing
+		t.position    = _safe_spawn_point(base_pos + along * lane)
 		t.arena_scale = _arena_scale
 		t.set_colour(ct)
-		t.size_scale  = max(0.4, sz * 0.75)
+		t.size_scale  = child_sz
 		t.can_split   = false
 		add_child(t)
 		t._apply_size()
@@ -894,6 +907,19 @@ func _do_ball_split(original: RigidBody2D, count: int, spread_angle: float) -> v
 		var angle: float = base_angle + randf_range(-spread_angle, spread_angle)
 		t.linear_velocity = Vector2.from_angle(angle) * speed
 		t.request_split.connect(_on_ball_split)
+
+
+func _safe_spawn_point(p: Vector2) -> Vector2:
+	## Keep a spawn point inside the arena polygon — pull outliers toward the
+	## centre so a split ball can never spawn in a wall or outside the play area.
+	if Geometry2D.is_point_in_polygon(p, _map_vertices):
+		return p
+	var c: Vector2 = get_design_centre()
+	for _step in 6:
+		p = p.lerp(c, 0.25)
+		if Geometry2D.is_point_in_polygon(p, _map_vertices):
+			return p
+	return c
 
 
 # ── Modifier helpers ───────────────────────────────────────────────────────────
