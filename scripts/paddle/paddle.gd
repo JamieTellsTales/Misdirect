@@ -28,6 +28,10 @@ var min_offset: float = -150.0
 var max_offset: float =  150.0
 
 
+var _flash_timer: float = 0.0   # Red hit-flash countdown (life lost)
+const FLASH_DUR: float = 0.35
+
+
 func _ready() -> void:
 	add_to_group("paddles")
 	paddle_color = ColourData.get_color(colour_type)
@@ -37,6 +41,18 @@ func _ready() -> void:
 	collision_layer |= 8
 	collision_mask  |= 8
 	queue_redraw()
+
+
+func hit_flash() -> void:
+	## Flash the paddle red — called by arena.gd when this zone loses a life.
+	_flash_timer = FLASH_DUR
+	queue_redraw()
+
+
+func _process(delta: float) -> void:
+	if _flash_timer > 0.0:
+		_flash_timer -= delta
+		queue_redraw()
 
 
 func _setup_collision_shape() -> void:
@@ -57,21 +73,25 @@ func _setup_collision_shape() -> void:
 
 
 func _draw() -> void:
+	var fill: Color = paddle_color
+	if _flash_timer > 0.0:
+		fill = paddle_color.lerp(Color(1.0, 0.25, 0.2), _flash_timer / FLASH_DUR)
+
 	if use_deflector:
 		var tri := PackedVector2Array([
 			Vector2(-paddle_length / 2.0,  paddle_thickness / 2.0),
 			Vector2( paddle_length / 2.0,  paddle_thickness / 2.0),
 			Vector2(0.0,                  -paddle_thickness),
 		])
-		draw_colored_polygon(tri, paddle_color)
+		draw_colored_polygon(tri, fill)
 		var border := PackedVector2Array(tri)
 		border.append(border[0])
-		draw_polyline(border, paddle_color.lightened(0.3), 2.0)
+		draw_polyline(border, fill.lightened(0.3), 2.0)
 	else:
 		var size := Vector2(paddle_length, paddle_thickness)
 		var rect := Rect2(-size / 2.0, size)
-		draw_rect(rect, paddle_color)
-		draw_rect(rect, paddle_color.lightened(0.3), false, 2.0)
+		draw_rect(rect, fill)
+		draw_rect(rect, fill.lightened(0.3), false, 2.0)
 
 
 ## Returns the current signed offset from zone_centre along move_direction.

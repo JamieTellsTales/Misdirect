@@ -47,6 +47,8 @@ var _defeat_stream: AudioStreamWAV
 var _hover_stream: AudioStreamWAV
 var _click_stream: AudioStreamWAV
 var _level_up_stream: AudioStreamWAV
+var _warning_stream: AudioStreamWAV
+var _collapse_stream: AudioStreamWAV
 
 
 func _ready() -> void:
@@ -92,6 +94,10 @@ func _ready() -> void:
 	_click_stream     = _generate_arpeggio([700.0, 1300.0], 0.07, 0.22)
 	# Rising three-note chime — level up celebration (D5→F#5→B5)
 	_level_up_stream  = _generate_arpeggio([587.33, 739.99, 987.77], 0.35, 0.45)
+	# Urgent double-beep — Final Countdown warning (two quick D6 pips)
+	_warning_stream   = _generate_arpeggio([1174.7, 1174.7], 0.22, 0.4)
+	# Low buzzy downward thud — a zone collapsing/sealing in elimination
+	_collapse_stream  = _generate_sweep(400.0, 70.0, 0.45, 0.55, true)
 
 
 func _ensure_music_bus() -> void:
@@ -183,6 +189,18 @@ func play_level_up() -> void:
 	## Play the rising three-note chime when the player levels up on the results screen.
 	_ui_player.stream = _level_up_stream
 	_ui_player.play()
+
+
+func play_warning() -> void:
+	## Play the urgent double-beep when Final Countdown kicks in.
+	_ui_player.stream = _warning_stream
+	_ui_player.play()
+
+
+func play_collapse() -> void:
+	## Play the low downward thud when an elimination zone seals shut.
+	sfx_player.stream = _collapse_stream
+	sfx_player.play()
 
 
 # ── Internal ─────────────────────────────────────────────────────────────────

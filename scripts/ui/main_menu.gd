@@ -4,9 +4,10 @@ class_name MainMenu
 
 const CornerHUD = preload("res://scripts/ui/corner_hud.gd")
 
-const MENU_ITEMS: Array = ["PLAY", "SETTINGS", "STATS", "UNLOCKS", "ACHIEVEMENTS", "EXIT"]
+const MENU_ITEMS: Array = ["PLAY", "HOW TO PLAY", "SETTINGS", "STATS", "UNLOCKS", "ACHIEVEMENTS", "EXIT"]
 const MENU_COLORS: Array = [
 	Color.FOREST_GREEN,
+	Color(0.3, 0.8, 0.8, 1.0),
 	Color.DODGER_BLUE,
 	Color.CORAL,
 	Color(0.65, 0.4, 0.9, 1.0),
@@ -15,7 +16,7 @@ const MENU_COLORS: Array = [
 ]
 
 var selected_index: int = 0
-var popup_state: int = 0  # 0 = none, 4 = achievements
+var popup_state: int = 0  # 0 = none, 5 = achievements (index into MENU_ITEMS)
 var _prev_selected_index: int = -1
 
 var title_pulse: float = 0.0
@@ -89,14 +90,16 @@ func _activate(index: int) -> void:
 			GameConfig.reset()
 			get_tree().change_scene_to_file("res://scenes/mode_select.tscn")
 		1:
-			get_tree().change_scene_to_file("res://scenes/settings_screen.tscn")
+			get_tree().change_scene_to_file("res://scenes/how_to_play.tscn")
 		2:
-			get_tree().change_scene_to_file("res://scenes/stats_screen.tscn")
+			get_tree().change_scene_to_file("res://scenes/settings_screen.tscn")
 		3:
-			get_tree().change_scene_to_file("res://scenes/shop.tscn")
+			get_tree().change_scene_to_file("res://scenes/stats_screen.tscn")
 		4:
-			popup_state = 4
+			get_tree().change_scene_to_file("res://scenes/shop.tscn")
 		5:
+			popup_state = 5
+		6:
 			get_tree().quit()
 
 

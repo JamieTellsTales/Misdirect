@@ -91,6 +91,17 @@ var _lives:              Dictionary = {}   # colour_type -> lives remaining
 var _zone_outward_dirs:  Dictionary = {}   # colour_type -> outward unit vector (for lives display)
 const STARTING_LIVES:    int        = 3
 
+# ── Juice / feedback ─────────────────────────────────────────────────────────
+var _shake_time:  float = 0.0    # Remaining screen-shake time (seconds)
+var _shake_dur:   float = 0.0    # Total duration of the current shake
+var _shake_mag:   float = 0.0    # Peak shake offset in canvas pixels
+var _hitstop_time: float = 0.0   # Remaining real-time hit-stop (seconds)
+var _life_popups: Array = []     # {pos: Vector2, colour: Color, timer: float}
+var _collapse_bursts: Array = [] # {pos: Vector2, colour: Color, timer: float, dur: float}
+var _final_warning_played: bool = false
+const LIFE_POPUP_DUR:   float = 0.9
+const COLLAPSE_BURST_DUR: float = 0.6
+
 
 func _ready() -> void:
 	AudioManager.play_game_music()
@@ -108,10 +119,19 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	# Feedback effects tick even after game over so they can finish gracefully.
+	_tick_feedback(delta)
+
 	if is_game_over:
 		return
 
 	session_time += delta
+
+	# Final Countdown: one-time warning as the last 10 seconds begin.
+	if not _final_warning_played and GameConfig.has_modifier("final_countdown") \
+			and GameConfig.game_mode == "normal" and round_duration - session_time <= 10.0:
+		_final_warning_played = true
+		AudioManager.play_warning()
 
 	# Extra Time: timer expired — end once the arena is empty
 	if _overtime:
@@ -150,6 +170,106 @@ func _process(delta: float) -> void:
 	if GameConfig.has_modifier("gravity_wells"):
 		_tick_gravity_well(delta)
 		queue_redraw()
+
+
+# ── Juice / feedback ─────────────────────────────────────────────────────────
+
+func _tick_feedback(delta: float) -> void:
+	## Advance screen shake, hit-stop, and transient popups/bursts each frame.
+	var needs_redraw: bool = false
+
+	# Hit-stop: count in real time (delta is time-scaled, so divide it back out).
+	if _hitstop_time > 0.0:
+		_hitstop_time -= delta / maxf(Engine.time_scale, 0.01)
+		if _hitstop_time <= 0.0:
+			Engine.time_scale = 1.0
+
+	# Screen shake via the viewport canvas transform (no Camera2D — see CLAUDE.md).
+	if _shake_time > 0.0:
+		_shake_time -= delta
+		if _shake_time <= 0.0:
+			get_viewport().canvas_transform = Transform2D.IDENTITY
+		else:
+			var falloff: float = _shake_time / _shake_dur       # 1 → 0
+			var amp: float = _shake_mag * falloff * falloff     # ease-out
+			var offset := Vector2(randf_range(-amp, amp), randf_range(-amp, amp))
+			get_viewport().canvas_transform = Transform2D(0.0, offset)
+
+	# Transient life-loss popups (float up + fade).
+	for i in range(_life_popups.size() - 1, -1, -1):
+		_life_popups[i].timer -= delta
+		if _life_popups[i].timer <= 0.0:
+			_life_popups.remove_at(i)
+		needs_redraw = true
+
+	# Transient zone-collapse bursts (expanding ring).
+	for i in range(_collapse_bursts.size() - 1, -1, -1):
+		_collapse_bursts[i].timer -= delta
+		if _collapse_bursts[i].timer <= 0.0:
+			_collapse_bursts.remove_at(i)
+		needs_redraw = true
+
+	if needs_redraw:
+		queue_redraw()
+
+
+func _add_shake(magnitude: float, duration: float) -> void:
+	## Trigger (or refresh, if stronger) a screen shake. Magnitude scales with arena.
+	var mag: float = magnitude * _arena_scale
+	if mag >= _shake_mag or _shake_time <= 0.0:
+		_shake_mag = mag
+	_shake_dur  = duration
+	_shake_time = duration
+
+
+func _trigger_hitstop(duration: float, scale: float) -> void:
+	## Briefly slow time for impact weight. Real-time; auto-resets in _tick_feedback.
+	Engine.time_scale = scale
+	_hitstop_time = duration
+
+
+func _clear_feedback() -> void:
+	## Reset all feedback state — call before round end / scene changes so the
+	## global canvas transform and time scale never get left modified.
+	Engine.time_scale = 1.0
+	_hitstop_time = 0.0
+	_shake_time = 0.0
+	get_viewport().canvas_transform = Transform2D.IDENTITY
+	_life_popups.clear()
+	_collapse_bursts.clear()
+
+
+func _zone_edge_mid(ct: int) -> Vector2:
+	## World-space midpoint of a colour's polygon edge.
+	var n: int = _map_vertices.size()
+	var side_idx: int = _side_for_colour.get(ct, -1)
+	if side_idx < 0:
+		return get_design_centre()
+	var a: Vector2 = _map_vertices[side_idx]
+	var b: Vector2 = _map_vertices[(side_idx + 1) % n]
+	return (a + b) / 2.0
+
+
+func _spawn_life_popup(ct: int) -> void:
+	var mid: Vector2 = _zone_edge_mid(ct)
+	var inward: Vector2 = -_zone_outward_dirs.get(ct, Vector2(0.0, 1.0))
+	var pos: Vector2 = mid + inward * 46.0 * _arena_scale
+	_life_popups.append({
+		"pos": pos,
+		"colour": ColourData.get_color(ct),
+		"timer": LIFE_POPUP_DUR,
+	})
+	queue_redraw()
+
+
+func _spawn_collapse_burst(ct: int) -> void:
+	_collapse_bursts.append({
+		"pos": _zone_edge_mid(ct),
+		"colour": ColourData.get_color(ct),
+		"timer": COLLAPSE_BURST_DUR,
+		"dur": COLLAPSE_BURST_DUR,
+	})
+	queue_redraw()
 
 
 # ── Active colours ─────────────────────────────────────────────────────────────
@@ -311,6 +431,8 @@ func _start_round() -> void:
 	is_game_over = false
 	collapsed_colours.clear()
 	_lives.clear()
+	_final_warning_played = false
+	_clear_feedback()
 	if GameConfig.game_mode == "endless":
 		_lives[player_colour] = STARTING_LIVES
 	elif GameConfig.game_mode == "elimination":
@@ -319,6 +441,7 @@ func _start_round() -> void:
 	if timer_display:
 		if GameConfig.game_mode == "normal":
 			timer_display.round_duration = round_duration
+			timer_display.final_countdown = GameConfig.has_modifier("final_countdown")
 			timer_display.start_timer()
 		else:
 			timer_display.visible = false
@@ -328,6 +451,9 @@ func _start_round() -> void:
 
 func _end_round(player_eliminated: bool = false) -> void:
 	is_game_over = true
+	# The results overlay pauses the tree, which would freeze _process and leave
+	# any in-flight shake / hit-stop applied — clear them now.
+	_clear_feedback()
 	if timer_display:
 		timer_display.stop_timer()
 
@@ -366,10 +492,12 @@ func _end_round(player_eliminated: bool = false) -> void:
 
 
 func _restart_game() -> void:
+	_clear_feedback()
 	get_tree().reload_current_scene()
 
 
 func _quit_game() -> void:
+	_clear_feedback()
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 
@@ -660,6 +788,8 @@ func _on_score_down(ct: int, points: int) -> void:
 
 
 func _on_wrong_catch(_ball: Node2D, ct: int) -> void:
+	# A small jolt on every wrong catch; the player's own mistakes hit harder.
+	_add_shake(6.0 if ct == player_colour else 3.5, 0.22)
 	match GameConfig.game_mode:
 		"endless":
 			if ct == player_colour:
@@ -904,6 +1034,10 @@ func _draw() -> void:
 		_draw_gravity_well()
 	if not _lives.is_empty():
 		_draw_lives()
+	if not _collapse_bursts.is_empty():
+		_draw_collapse_bursts()
+	if not _life_popups.is_empty():
+		_draw_life_popups()
 
 
 func _draw_arena_background() -> void:
@@ -1033,12 +1167,53 @@ func _draw_lives() -> void:
 			draw_arc(dot_pos, dot_r, 0, TAU, 24, border_col, 1.0, true)
 
 
+func _draw_collapse_bursts() -> void:
+	for b in _collapse_bursts:
+		var t: float     = 1.0 - b.timer / b.dur            # 0 → 1 progress
+		var col: Color   = b.colour
+		var pos: Vector2 = b.pos
+		var radius: float = (30.0 + 130.0 * t) * _arena_scale
+		var alpha: float  = (1.0 - t) * 0.9
+		# Expanding shockwave ring
+		draw_arc(pos, radius, 0, TAU, 48, Color(col.r, col.g, col.b, alpha), 4.0 * (1.0 - t) + 1.0, true)
+		# Debris shards flung outward
+		var shards: int = 8
+		for i in shards:
+			var ang: float = i * TAU / shards + t * 0.6
+			var dist: float = radius * 0.9
+			var shard_pos: Vector2 = pos + Vector2.from_angle(ang) * dist
+			draw_circle(shard_pos, (4.0 * (1.0 - t) + 1.0) * _arena_scale,
+				Color(col.r, col.g, col.b, alpha), true, -1.0, true)
+
+
+func _draw_life_popups() -> void:
+	var font := FontManager.get_font()
+	for p in _life_popups:
+		var frac: float = p.timer / LIFE_POPUP_DUR          # 1 → 0
+		var rise: float = (1.0 - frac) * 40.0 * _arena_scale
+		var pos: Vector2 = p.pos - Vector2(0.0, rise)
+		var alpha: float = clampf(frac * 1.4, 0.0, 1.0)
+		var size: int = int(22 * _arena_scale)
+		var text := "-1 LIFE"
+		var w: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+		var col: Color = p.colour
+		draw_string(font, Vector2(pos.x - w / 2.0 + 1.0, pos.y + 1.0), text,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(0.0, 0.0, 0.0, alpha * 0.7))
+		draw_string(font, Vector2(pos.x - w / 2.0, pos.y), text,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(col.r, col.g, col.b, alpha))
+
+
 func _lose_life(ct: int) -> void:
 	## Deduct one life from ct. Triggers zone collapse or game over at zero.
 	if ct in collapsed_colours:
 		return
 	_lives[ct] = max(0, _lives.get(ct, 0) - 1)
 	queue_redraw()
+	# Feedback: "-1 LIFE" popup by the zone + a red hit-flash on the paddle.
+	_spawn_life_popup(ct)
+	var lp = paddles.get(ct)
+	if lp and lp.has_method("hit_flash"):
+		lp.hit_flash()
 	# Elimination: an AI paddle on its last life plays sharper.
 	if _lives[ct] == 1 and GameConfig.game_mode == "elimination":
 		var p = paddles.get(ct)
@@ -1056,6 +1231,16 @@ func _collapse_zone(ct: int) -> void:
 	if ct in collapsed_colours:
 		return
 	collapsed_colours.append(ct)
+
+	# Dramatic feedback: burst at the sealed edge, a solid shake, a brief
+	# hit-stop, and a low collapse thud.
+	_spawn_collapse_burst(ct)
+	_add_shake(16.0, 0.5)
+	AudioManager.play_collapse()
+	# Skip the hit-stop when the player is the one collapsing — the game ends on
+	# the same frame and _end_round resets time_scale immediately anyway.
+	if ct != player_colour:
+		_trigger_hitstop(0.08, 0.25)
 
 	# Remove the zone (balls can no longer enter it)
 	if zones.has(ct):

@@ -41,6 +41,10 @@ var split_cooldown: float = 0.0
 var _erratic_timer: float = 0.0
 var _surge_timer:   float = 0.0
 
+# Motion trail — recent global positions, newest last (readability aid)
+const TRAIL_LEN: int = 9
+var _trail: PackedVector2Array = PackedVector2Array()
+
 
 func _ready() -> void:
 	add_to_group("balls")
@@ -86,6 +90,12 @@ func _physics_process(delta: float) -> void:
 	_clamp_speed()
 	if split_cooldown > 0:
 		split_cooldown -= delta
+
+	# Record motion trail (global positions; drawn via to_local so rotation-safe)
+	_trail.append(global_position)
+	if _trail.size() > TRAIL_LEN:
+		_trail.remove_at(0)
+	queue_redraw()
 
 	# Erratic Balls: random direction jinks mid-flight
 	if GameConfig.has_modifier("erratic_balls"):
@@ -144,10 +154,26 @@ func _on_body_entered(body: Node) -> void:
 
 
 func _draw() -> void:
+	_draw_trail()
+
 	draw_circle(Vector2.ZERO, radius, ball_color, true, -1.0, true)
 
 	var border_width: float = 2.0 + size_scale
 	draw_arc(Vector2.ZERO, radius, 0, TAU, 64, ball_color.lightened(0.3), border_width, true)
+
+
+func _draw_trail() -> void:
+	## Fading tail behind the ball — older samples are smaller and more transparent.
+	## Points are stored in global space; to_local keeps them world-aligned even
+	## if the body has rotated.
+	var n: int = _trail.size()
+	if n < 2:
+		return
+	for i in range(n - 1):
+		var frac: float = float(i) / float(n - 1)   # 0 (oldest) → 1 (newest)
+		var seg_r: float = radius * (0.25 + 0.6 * frac)
+		var alpha: float = 0.28 * frac
+		draw_circle(to_local(_trail[i]), seg_r, Color(ball_color.r, ball_color.g, ball_color.b, alpha), true, -1.0, true)
 
 	if has_blame_stamp:
 		var stamp_color := Color.BLACK

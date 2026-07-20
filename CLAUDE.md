@@ -106,7 +106,7 @@ main_menu → mode_select → map_select → pre_game_config → arena
                                                             ├─ pause_menu (overlay, ESC)
                                                             │    └─ settings_screen (overlay; reloads arena on exit)
                                                             └─ game_over (overlay) → replay arena / main_menu
-main_menu also → settings_screen, stats_screen, shop, profile_select/profile_setup
+main_menu also → how_to_play, settings_screen, stats_screen, shop, profile_select/profile_setup
 ```
 First run with no profiles jumps straight to profile_setup.
 
@@ -223,5 +223,15 @@ signal ball_caught(ball: Ball)
 - When adding a stat: add the var, default it in `load_stats()`, read it there,
   write it in `save_stats()`, and update it in `record_game_end()` if per-game.
 
+### Juice / feedback (arena.gd)
+- Screen shake uses `get_viewport().canvas_transform` (NOT a Camera2D). Hit-stop
+  uses `Engine.time_scale`. Both are global, so `_clear_feedback()` resets them
+  in `_end_round`/`_restart_game`/`_quit_game`/`_start_round` — the results
+  overlay pauses the tree, which would otherwise freeze them mid-effect.
+- Transient effects (`_life_popups`, `_collapse_bursts`) tick in `_tick_feedback`
+  (called before the `is_game_over` guard so they can finish) and draw in `_draw`.
+- Balls draw a fading motion trail; paddles flash red via `hit_flash()` on life loss.
+
 ### Performance
 - Balls capped via `max_balls` (default 10) checked in `_try_spawn_ball()`.
+- Balls `queue_redraw()` every physics frame (motion trail needs it).
