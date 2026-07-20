@@ -91,12 +91,14 @@ const MODIFIERS: Array = [
 		"label": "Extra Time",
 		"desc": "When the timer ends, play continues until all remaining balls are collected",
 		"unlock_level": 6,
+		"timed_only": true,
 	},
 	{
 		"id": "final_countdown",
 		"label": "Final Countdown",
 		"desc": "In the last 10 seconds, balls spawn at double frequency",
 		"unlock_level": 8,
+		"timed_only": true,
 	},
 	{
 		"id": "return_to_sender",
@@ -234,7 +236,30 @@ func has_modifier(mod: String) -> bool:
 	return active_modifiers.has(mod)
 
 
+func is_timed_mode() -> bool:
+	## Only Normal mode has a round timer; Endless and Elimination run open-ended.
+	return game_mode == "normal"
+
+
+func is_modifier_compatible(mod_id: String) -> bool:
+	## Timed-only modifiers (extra_time, final_countdown) do nothing without a
+	## round timer, so they're unavailable in Endless / Elimination.
+	for m in MODIFIERS:
+		if m["id"] == mod_id and m.get("timed_only", false):
+			return is_timed_mode()
+	return true
+
+
+func prune_incompatible_modifiers() -> void:
+	## Drop any active modifiers that don't apply to the current game mode.
+	for mod_id in active_modifiers.duplicate():
+		if not is_modifier_compatible(mod_id):
+			active_modifiers.erase(mod_id)
+
+
 func toggle_modifier(mod: String) -> void:
+	if not is_modifier_compatible(mod):
+		return
 	if active_modifiers.has(mod):
 		active_modifiers.erase(mod)
 	else:

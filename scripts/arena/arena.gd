@@ -105,6 +105,7 @@ const COLLAPSE_BURST_DUR: float = 0.6
 
 func _ready() -> void:
 	AudioManager.play_game_music()
+	GameConfig.prune_incompatible_modifiers()  # e.g. drop timed-only mods in endless
 	_build_active_colours()
 	_init_scores()
 	_setup_walls()
@@ -866,12 +867,23 @@ func _do_ball_split(original: RigidBody2D, count: int, spread_angle: float) -> v
 	var vel: Vector2 = original.linear_velocity
 	var ct: int      = original.colour_type
 	var sz: float    = original.size_scale
+	var speed: float = maxf(vel.length(), original.min_speed) * 1.1
 
 	original.queue_free()
 
+	# Splits only trigger at the player's paddle (see ball.gd), which sits right
+	# in front of the player's zone. Aim children toward the arena centre so they
+	# fly back into play instead of immediately falling into the zone behind the
+	# paddle (which would catch several wrong-colour balls at once and end the run).
+	var centre: Vector2  = get_design_centre()
+	var inward: Vector2  = centre - pos
+	var base_angle: float = inward.angle() if inward.length() > 1.0 else vel.angle()
+	# Nudge the spawn point off the zone edge so children don't start inside it.
+	var spawn_pos: Vector2 = pos + inward.normalized() * 24.0 * _arena_scale
+
 	for i in count:
 		var t: RigidBody2D = ball_scene.instantiate()
-		t.position    = pos
+		t.position    = spawn_pos
 		t.arena_scale = _arena_scale
 		t.set_colour(ct)
 		t.size_scale  = max(0.4, sz * 0.75)
@@ -879,8 +891,8 @@ func _do_ball_split(original: RigidBody2D, count: int, spread_angle: float) -> v
 		add_child(t)
 		t._apply_size()
 
-		var angle: float = vel.angle() + randf_range(-spread_angle, spread_angle)
-		t.linear_velocity = Vector2.from_angle(angle) * vel.length() * 1.1
+		var angle: float = base_angle + randf_range(-spread_angle, spread_angle)
+		t.linear_velocity = Vector2.from_angle(angle) * speed
 		t.request_split.connect(_on_ball_split)
 
 

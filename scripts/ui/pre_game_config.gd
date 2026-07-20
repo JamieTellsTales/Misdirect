@@ -73,7 +73,8 @@ func _ready() -> void:
 			if m["id"] == mod_id:
 				found = m
 				break
-		if not found.is_empty() and _is_modifier_unlocked(found):
+		if not found.is_empty() and _is_modifier_unlocked(found) \
+				and GameConfig.is_modifier_compatible(mod_id):
 			GameConfig.active_modifiers.append(mod_id)
 
 
@@ -189,7 +190,7 @@ func _handle_click(pos: Vector2) -> void:
 	for i in _modifier_chip_rects.size():
 		if _modifier_chip_rects[i].has_point(pos):
 			var mod: Dictionary = GameConfig.MODIFIERS[i]
-			if _is_modifier_unlocked(mod):
+			if _is_modifier_unlocked(mod) and GameConfig.is_modifier_compatible(mod["id"]):
 				AudioManager.play_button_click()
 				GameConfig.toggle_modifier(mod["id"])
 			return
@@ -547,13 +548,16 @@ func _draw_modifiers() -> void:
 		var chip_rect        := Rect2(chip_x, chip_y, chip_w, MOD_CHIP_H)
 		_modifier_chip_rects.append(chip_rect)
 
-		var is_active:   bool = GameConfig.has_modifier(mod["id"])
-		var is_hovered:  bool = hover_section == "modifier" and hover_index == i
-		var is_unlocked: bool = _is_modifier_unlocked(mod)
+		var is_active:     bool = GameConfig.has_modifier(mod["id"])
+		var is_hovered:    bool = hover_section == "modifier" and hover_index == i
+		var is_unlocked:   bool = _is_modifier_unlocked(mod)
+		var is_compatible: bool = GameConfig.is_modifier_compatible(mod["id"])
+		# Disabled = can't be toggled right now (locked OR wrong game mode).
+		var is_disabled:   bool = not is_unlocked or not is_compatible
 
 		# Chip background
 		var bg: Color
-		if not is_unlocked:
+		if is_disabled:
 			bg = Color(0.09, 0.09, 0.13, 1.0)
 		elif is_active:
 			bg = Color(0.1, 0.28, 0.14, 1.0)
@@ -565,7 +569,7 @@ func _draw_modifiers() -> void:
 
 		# Chip border
 		var border: Color
-		if not is_unlocked:
+		if is_disabled:
 			border = Color(0.22, 0.22, 0.28, 0.5)
 		elif is_active:
 			border = Color(0.35, 0.88, 0.48, 0.85)
@@ -575,13 +579,17 @@ func _draw_modifiers() -> void:
 			border = Color(0.28, 0.28, 0.4, 0.55)
 		draw_rect(chip_rect, border, false, 1.5)
 
-		# Checkbox / lock indicator on the left
+		# Checkbox / lock / incompatible indicator on the left
 		var check_cx: float = chip_x + 16.0
 		var check_cy: float = chip_y + MOD_CHIP_H / 2.0
 		if not is_unlocked:
 			# Lock icon (small padlock drawn with lines)
 			draw_arc(Vector2(check_cx, check_cy - 2.0), 5.0, PI, TAU, 10, Color(0.35, 0.35, 0.42, 0.8), 1.5)
 			draw_rect(Rect2(check_cx - 5.0, check_cy - 1.0, 10.0, 8.0), Color(0.28, 0.28, 0.35, 0.8))
+		elif not is_compatible:
+			# Unavailable in this mode — draw a small "no" bar.
+			draw_line(Vector2(check_cx - 6.0, check_cy), Vector2(check_cx + 6.0, check_cy),
+				Color(0.5, 0.4, 0.3, 0.8), 2.0)
 		else:
 			# Small checkbox
 			var cb_half: float = 7.0
@@ -594,7 +602,7 @@ func _draw_modifiers() -> void:
 
 		# Label text
 		var label_col: Color
-		if not is_unlocked:
+		if is_disabled:
 			label_col = Color(0.32, 0.32, 0.38, 1.0)
 		elif is_active:
 			label_col = Color(0.95, 1.0, 0.95, 1.0)
@@ -606,13 +614,17 @@ func _draw_modifiers() -> void:
 		draw_string(font, Vector2(chip_x + 30.0, chip_y + MOD_CHIP_H / 2.0 + 5.0),
 			mod["label"], HORIZONTAL_ALIGNMENT_LEFT, -1, lbl_sz, label_col)
 
-		# Lock level hint on right edge if locked
+		# Right-edge hint: unlock level if locked, or "timed only" if wrong mode
+		var hint_text: String = ""
 		if not is_unlocked:
-			var lock_hint: String = "Lv %d" % mod.get("unlock_level", 0)
+			hint_text = "Lv %d" % mod.get("unlock_level", 0)
+		elif not is_compatible:
+			hint_text = "timed only"
+		if hint_text != "":
 			var lh_sz: int = 11
-			var lh_w: float = font.get_string_size(lock_hint, HORIZONTAL_ALIGNMENT_LEFT, -1, lh_sz).x
+			var lh_w: float = font.get_string_size(hint_text, HORIZONTAL_ALIGNMENT_LEFT, -1, lh_sz).x
 			draw_string(font, Vector2(chip_x + chip_w - lh_w - 8.0, chip_y + MOD_CHIP_H / 2.0 + 4.0),
-				lock_hint, HORIZONTAL_ALIGNMENT_LEFT, -1, lh_sz, Color(0.55, 0.45, 0.25, 0.85))
+				hint_text, HORIZONTAL_ALIGNMENT_LEFT, -1, lh_sz, Color(0.55, 0.45, 0.25, 0.85))
 
 	# Track where chips end
 	var n_rows: int = ceili(float(GameConfig.MODIFIERS.size()) / float(MOD_COLS))
@@ -630,15 +642,18 @@ func _draw_modifiers() -> void:
 		draw_rect(Rect2(COL_LEFT, tip_y, sw2 - COL_LEFT * 2.0, tip_h),
 			Color(0.35, 0.45, 0.65, 0.6) if is_ul else Color(0.3, 0.3, 0.4, 0.4), false, 1.0)
 
+		var is_compat: bool = GameConfig.is_modifier_compatible(hov_mod["id"])
 		var tip_text: String
-		if is_ul:
-			tip_text = "%s — %s" % [hov_mod["label"], hov_mod["desc"]]
-		else:
+		if not is_ul:
 			var req: int = hov_mod.get("unlock_level", 0)
 			tip_text = "%s — Unlocks at level %d  (you are level %d)" % [hov_mod["label"], req, level]
+		elif not is_compat:
+			tip_text = "%s — Only available in timed modes (Normal)" % hov_mod["label"]
+		else:
+			tip_text = "%s — %s" % [hov_mod["label"], hov_mod["desc"]]
 		draw_string(font, Vector2(COL_LEFT + 14.0, tip_y + 21.0), tip_text,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 14,
-			Color(0.75, 0.85, 1.0, 1.0) if is_ul else Color(0.55, 0.5, 0.35, 0.9))
+			Color(0.75, 0.85, 1.0, 1.0) if (is_ul and is_compat) else Color(0.55, 0.5, 0.35, 0.9))
 
 
 func _draw_buttons() -> void:
