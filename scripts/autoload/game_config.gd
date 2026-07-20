@@ -2,60 +2,72 @@ extends Node
 ## GameConfig — persists selected power up and active modifiers between scenes
 
 ## Canonical list of all power-ups. Add entries here to extend the shop and pre-game screen.
+## "kind": "active"  → hold-key ability, goes in the single active slot (SPACE).
+##         "passive" → automatic on-hit / always-on effect, goes in a passive slot.
+##         "" (None) → placeholder, valid in any slot.
 const POWER_UPS: Array = [
 	{
 		"id": "",
 		"label": "None",
 		"desc": "Standard game — no special abilities",
 		"price": 0,
+		"kind": "",
 	},
 	{
 		"id": "gravity",
 		"label": "Gravity",
-		"desc": "Hold key to pull nearby balls toward your paddle",
+		"desc": "Hold SPACE to pull nearby balls toward your paddle",
 		"price": 50,
+		"kind": "active",
 	},
 	{
 		"id": "anti_gravity",
 		"label": "Anti-Gravity",
-		"desc": "Hold key to repel nearby balls away from your paddle",
+		"desc": "Hold SPACE to repel nearby balls away from your paddle",
 		"price": 50,
+		"kind": "active",
+	},
+	{
+		"id": "cyclone",
+		"label": "Cyclone",
+		"desc": "Hold SPACE to spin nearby balls wildly around your paddle",
+		"price": 150,
+		"kind": "active",
 	},
 	{
 		"id": "double_rebound",
 		"label": "Double Rebound",
 		"desc": "Each ball hitting your paddle splits into two — doubles Multi Shot's output when equipped together",
 		"price": 75,
+		"kind": "passive",
 	},
 	{
 		"id": "railgun",
 		"label": "Railgun",
 		"desc": "Balls that hit your paddle are launched at extreme speed",
 		"price": 100,
+		"kind": "passive",
 	},
 	{
 		"id": "multi_shot",
 		"label": "Multi Shot",
 		"desc": "Balls hitting your paddle split into 2–5 random balls",
 		"price": 125,
+		"kind": "passive",
 	},
 	{
 		"id": "clone",
 		"label": "Clone",
 		"desc": "Balls hitting your paddle split into two near-identical copies",
 		"price": 100,
+		"kind": "passive",
 	},
 	{
 		"id": "deflector",
 		"label": "Deflector",
 		"desc": "Your paddle becomes a triangle that angles balls sideways on impact",
 		"price": 75,
-	},
-	{
-		"id": "cyclone",
-		"label": "Cyclone",
-		"desc": "Hold key to spin nearby balls wildly around your paddle",
-		"price": 150,
+		"kind": "passive",
 	},
 ]
 
@@ -157,12 +169,14 @@ const MAP_UNLOCK_REQUIREMENTS: Dictionary = {
 ## Total achievements defined in the game. Update this as achievements are added.
 const TOTAL_ACHIEVEMENTS: int = 0
 
-## Power-up slot definitions. Slot 0 unlocks first (level 10).
-## key_primary / key_alt are KEY_* constants — both activate the slot during play.
+## Power-up slot definitions.
+## Slot 0 is the single ACTIVE slot (hold SPACE) and is free from the start.
+## Slots 1-2 are PASSIVE slots (always-on, no key) unlocked by level + token fee.
+## key_primary / key_alt (active slot only) are KEY_* constants held during play.
 const POWER_UP_SLOT_DEFS: Array = [
-	{"key_label": "SPACE / PgDn", "key_primary": KEY_SPACE,    "key_alt": KEY_PAGEDOWN, "unlock_level": 10, "unlock_price": 100},
-	{"key_label": "Q / Del",      "key_primary": KEY_Q,        "key_alt": KEY_DELETE,   "unlock_level": 20, "unlock_price": 250},
-	{"key_label": "E / End",      "key_primary": KEY_E,        "key_alt": KEY_END,      "unlock_level": 30, "unlock_price": 500},
+	{"kind": "active",  "key_label": "SPACE", "key_primary": KEY_SPACE, "key_alt": KEY_PAGEDOWN, "unlock_level": 1,  "unlock_price": 0},
+	{"kind": "passive", "key_label": "PASSIVE", "key_primary": KEY_NONE, "key_alt": KEY_NONE,    "unlock_level": 10, "unlock_price": 200},
+	{"kind": "passive", "key_label": "PASSIVE", "key_primary": KEY_NONE, "key_alt": KEY_NONE,    "unlock_level": 20, "unlock_price": 400},
 ]
 
 var selected_power_up: String = ""  # Legacy — kept for compatibility; use power_up_slots
@@ -230,6 +244,21 @@ func reset() -> void:
 func has_power_up_in_slot(pu_id: String) -> bool:
 	## Returns true if pu_id is currently assigned to any power-up slot.
 	return pu_id in power_up_slots
+
+
+func powerup_kind(pu_id: String) -> String:
+	## "active", "passive", or "" (None / unknown).
+	for pu in POWER_UPS:
+		if pu["id"] == pu_id:
+			return pu.get("kind", "")
+	return ""
+
+
+func slot_kind(slot_idx: int) -> String:
+	## "active" or "passive" for the given slot index.
+	if slot_idx < 0 or slot_idx >= POWER_UP_SLOT_DEFS.size():
+		return "active"
+	return POWER_UP_SLOT_DEFS[slot_idx].get("kind", "active")
 
 
 func has_modifier(mod: String) -> bool:

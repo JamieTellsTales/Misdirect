@@ -61,7 +61,10 @@ func _ready() -> void:
 	var saved: Array = StatsManager.last_power_up_slots
 	for i in GameConfig.POWER_UP_SLOT_DEFS.size():
 		var pu_id: String = saved[i] if i < saved.size() else ""
-		if pu_id == "" or StatsManager.is_powerup_unlocked(pu_id):
+		# Keep the saved assignment only if it's owned AND its kind matches this
+		# slot (active power-ups in the active slot, passives in passive slots).
+		var kind_ok: bool = pu_id == "" or GameConfig.powerup_kind(pu_id) == GameConfig.slot_kind(i)
+		if pu_id == "" or (StatsManager.is_powerup_unlocked(pu_id) and kind_ok):
 			GameConfig.power_up_slots[i] = pu_id
 		else:
 			GameConfig.power_up_slots[i] = ""
@@ -289,7 +292,7 @@ func _draw_power_up_slots() -> void:
 	_slot_assign_rects.clear()
 	_slot_buy_rects.clear()
 
-	_draw_section_header(font, "POWER-UP SLOTS", "assign abilities to keys", slot_start_y - 30.0)
+	_draw_section_header(font, "POWER-UP SLOTS", "one active (hold SPACE) + two passive (always on)", slot_start_y - 30.0)
 
 	var level: int = StatsManager.get_level()
 
@@ -397,13 +400,25 @@ func _draw_power_up_slots() -> void:
 	modifier_start_y = slot_start_y + GameConfig.POWER_UP_SLOT_DEFS.size() * ROW_HEIGHT + SECTION_GAP + 40.0
 
 
+func _slot_pickable_powerups(slot_idx: int) -> Array:
+	## Power-ups offered for a slot: "None" plus every power-up whose kind matches
+	## the slot's kind (active slot lists active abilities, passive slots passives).
+	var kind: String = GameConfig.slot_kind(slot_idx)
+	var out: Array = []
+	for pu in GameConfig.POWER_UPS:
+		if pu["id"] == "" or pu.get("kind", "") == kind:
+			out.append(pu)
+	return out
+
+
 func _draw_slot_picker() -> void:
 	## Draw the power-up picker overlay for _open_slot_picker.
 	var font := FontManager.get_font()
 	_picker_option_rects.clear()
 	_picker_buy_rects.clear()
 
-	var n_rows: int    = GameConfig.POWER_UPS.size()
+	var options: Array = _slot_pickable_powerups(_open_slot_picker)
+	var n_rows: int    = options.size()
 	var picker_h: float = PICKER_HEADER_H + n_rows * PICKER_ROW_H + PICKER_PAD * 2.0
 	var sh: float = get_viewport_rect().size.y
 	var sw: float = get_viewport_rect().size.x
@@ -417,8 +432,8 @@ func _draw_slot_picker() -> void:
 	draw_rect(Rect2(PICKER_X, picker_y, PICKER_W, picker_h), Color(0.35, 0.45, 0.65, 0.85), false, 2.0)
 
 	# Header
-	var def: Dictionary = GameConfig.POWER_UP_SLOT_DEFS[_open_slot_picker]
-	var title_str: String = "Assign power-up to  %s" % def["key_label"]
+	var kind: String = GameConfig.slot_kind(_open_slot_picker)
+	var title_str: String = "Choose an ACTIVE power-up" if kind == "active" else "Choose a PASSIVE power-up"
 	var title_sz: int = 20
 	var title_w := font.get_string_size(title_str, HORIZONTAL_ALIGNMENT_LEFT, -1, title_sz).x
 	var header_cx: float = PICKER_X + PICKER_W / 2.0
@@ -431,7 +446,7 @@ func _draw_slot_picker() -> void:
 
 	# Power-up rows (includes "None" at index 0 with id "")
 	for i in n_rows:
-		var pu: Dictionary  = GameConfig.POWER_UPS[i]
+		var pu: Dictionary  = options[i]
 		var pu_id: String   = pu["id"]
 		var row_y: float    = picker_y + PICKER_HEADER_H + PICKER_PAD + i * PICKER_ROW_H
 		var mid_y: float    = row_y + PICKER_ROW_H / 2.0

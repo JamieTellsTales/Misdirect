@@ -280,7 +280,11 @@ func unlock_powerup(id: String, price: int) -> bool:
 
 
 func is_slot_unlocked(slot_idx: int) -> bool:
-	## Returns true if the player has paid the token fee to unlock this slot.
+	## Returns true if this slot is available. Free slots (unlock_price 0, e.g. the
+	## always-available active slot) count as unlocked without purchase.
+	if slot_idx >= 0 and slot_idx < GameConfig.POWER_UP_SLOT_DEFS.size():
+		if GameConfig.POWER_UP_SLOT_DEFS[slot_idx].get("unlock_price", 0) <= 0:
+			return true
 	return slot_idx in unlocked_slots
 
 

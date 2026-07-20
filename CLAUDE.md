@@ -72,10 +72,13 @@ heptagon, octagon. Maps unlock via wins on the previous map
 
 ### Power-Ups & Modifiers
 - **Power-ups** (`GameConfig.POWER_UPS`) are bought with tokens in the shop and
-  assigned to up to 3 slots pre-game (`power_up_slots`). Slots unlock by level +
-  token fee (`POWER_UP_SLOT_DEFS`; keys SPACE/Q/E). Hold-key power-ups (gravity,
-  anti_gravity, cyclone) are handled in `player_paddle.gd`; on-hit power-ups
-  (railgun, splits, deflector) in `ball.gd` / `paddle.gd`.
+  assigned to 3 pre-game slots (`power_up_slots`). Each power-up has a `kind`:
+  **active** (hold-key: gravity, anti_gravity, cyclone — handled in
+  `player_paddle.gd`) or **passive** (automatic/always-on: railgun, splits,
+  deflector — in `ball.gd` / `paddle.gd`). Slot 0 is the single ACTIVE slot
+  (hold SPACE), free from the start; slots 1-2 are PASSIVE slots unlocked by
+  level + token fee (`POWER_UP_SLOT_DEFS`). The pre-game picker only offers
+  power-ups whose kind matches the slot.
 - **Modifiers** (`GameConfig.MODIFIERS`) are free toggles unlocked by level:
   rotated_colours, chaos_ball, load_balanced, random_directions, extra_time,
   final_countdown, return_to_sender, speed_ball, erratic_balls, black_hole,

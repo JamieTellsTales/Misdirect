@@ -172,6 +172,17 @@ func _draw_card(font: Font, pu: Dictionary, x: float, y: float) -> void:
 	draw_string(font, Vector2(x + 14, y + 28),
 		pu["label"], HORIZONTAL_ALIGNMENT_LEFT, -1, name_size, name_col)
 
+	# ACTIVE / PASSIVE tag (top-right)
+	var kind: String = pu.get("kind", "")
+	if kind != "":
+		var tag: String = "ACTIVE" if kind == "active" else "PASSIVE"
+		var tag_col: Color = Color(0.5, 0.75, 1.0, 1.0) if kind == "active" else Color(0.75, 0.6, 0.95, 1.0)
+		var tag_sz: int = 11
+		var tag_w := font.get_string_size(tag, HORIZONTAL_ALIGNMENT_LEFT, -1, tag_sz).x
+		var tag_x := x + CARD_W - tag_w - 12.0
+		draw_rect(Rect2(tag_x - 5.0, y + 10.0, tag_w + 10.0, 16.0), Color(tag_col.r, tag_col.g, tag_col.b, 0.14))
+		draw_string(font, Vector2(tag_x, y + 22.0), tag, HORIZONTAL_ALIGNMENT_LEFT, -1, tag_sz, tag_col)
+
 	# Description (word-wrapped)
 	var desc_col := Color(0.5, 0.65, 0.52, 1.0) if owned else Color(0.45, 0.45, 0.58, 1.0)
 	_draw_wrapped_text(font, pu["desc"], x + 14, y + 52, CARD_W - 28.0, 13, desc_col)

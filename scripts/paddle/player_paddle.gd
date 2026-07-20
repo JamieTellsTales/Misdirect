@@ -84,11 +84,14 @@ func _apply_cyclone() -> void:
 
 
 func _is_slot_key_held(pu_id: String) -> bool:
-	## Returns true if the slot containing pu_id has its activation key held.
+	## Returns true if the active slot holding pu_id has its key held.
+	## Only active-kind slots have keys; passive slots are always-on and skipped.
 	for slot_idx in GameConfig.POWER_UP_SLOT_DEFS.size():
 		if GameConfig.power_up_slots[slot_idx] == pu_id:
 			var def: Dictionary = GameConfig.POWER_UP_SLOT_DEFS[slot_idx]
-			return Input.is_key_pressed(def["key_primary"]) or Input.is_key_pressed(def["key_alt"])
+			if def.get("kind", "active") != "active":
+				continue
+			return Input.is_key_pressed(def["key_primary"]) or Input.is_key_pressed(def.get("key_alt", KEY_NONE))
 	return false
 
 
