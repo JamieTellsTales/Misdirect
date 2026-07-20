@@ -134,12 +134,13 @@ func _draw_arrow(from: Vector2, to: Vector2, col: Color) -> void:
 
 
 func _draw_rules(font: Font, origin: Vector2, w: float) -> void:
+	var your_col: Color = ColourData.get_color(ColourData.ColourType.GREEN)
 	var rules: Array = [
-		["You are GREEN.", "You control the green paddle on the bottom edge.", ColourData.get_color(ColourData.ColourType.GREEN)],
-		["Welcome your colour.", "Let green balls slip past into your zone to score points.", Color(0.55, 0.85, 0.55, 1.0)],
+		["Your zone.", "You control the paddle on the bottom edge; your colour is shown in the arena.", your_col],
+		["Welcome your colour.", "Let balls of your colour slip past into your zone to score points.", Color(0.55, 0.85, 0.55, 1.0)],
 		["Turn away the rest.", "Every other colour is a trap — catching one costs you score or a life.", Color(0.95, 0.5, 0.45, 1.0)],
 		["Size matters.", "Big balls are worth more points; small balls fly faster.", Color(0.7, 0.75, 0.9, 1.0)],
-		["Kit yourself out.", "Spend tokens on power-ups, and toggle modifiers to change the rules.", Color(0.85, 0.75, 0.4, 1.0)],
+		["Make it yours.", "Recolour any zone in Settings → Colours & Accessibility, then kit out with power-ups.", Color(0.6, 0.78, 0.95, 1.0)],
 	]
 
 	var y: float = origin.y

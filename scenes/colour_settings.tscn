@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://coloursettings1"]
+
+[ext_resource type="Script" path="res://scripts/ui/colour_settings.gd" id="1_coloursel"]
+
+[node name="ColourSettings" type="Node2D"]
+script = ExtResource("1_coloursel")

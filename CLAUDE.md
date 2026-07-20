@@ -36,6 +36,12 @@ other zones are AI-controlled paddles with per-colour personalities.
 ### Colours
 Defined in `scripts/resources/colour_data.gd` (`ColourData`, `ColourType` enum):
 BLUE, GREEN, RED, YELLOW, PURPLE, ORANGE, CYAN, PINK. Up to 8 players/zones.
+`ColourData.get_color(ct)` returns the player's accessibility override if set,
+else the default — overrides are palette indices into
+`ColourData.ACCESSIBLE_PALETTE` (colour-blind-safe Okabe-Ito set), stored
+device-level in `SettingsManager.zone_colours` and edited on the
+`colour_settings` screen (Settings → Colours & Accessibility). All UI/zones/
+balls resolve colour through `get_color`, so overrides apply on the next build.
 
 AI personalities live in `ai_paddle.gd::_apply_personality()` — each colour has its
 own `reaction_delay`, `accuracy`, `move_speed`, `prediction_strength`, plus quirks
@@ -109,7 +115,7 @@ main_menu → mode_select → map_select → pre_game_config → arena
                                                             ├─ pause_menu (overlay, ESC)
                                                             │    └─ settings_screen (overlay; reloads arena on exit)
                                                             └─ game_over (overlay) → replay arena / main_menu
-main_menu also → how_to_play, settings_screen, stats_screen, shop, profile_select/profile_setup
+main_menu also → how_to_play, settings_screen (→ colour_settings), stats_screen, shop, profile_select/profile_setup
 ```
 First run with no profiles jumps straight to profile_setup.
 
