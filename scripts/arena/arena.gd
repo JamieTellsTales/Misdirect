@@ -871,32 +871,24 @@ func _do_ball_split(original: RigidBody2D, count: int, spread_angle: float) -> v
 
 	original.queue_free()
 
-	# Splits only trigger at the player's paddle (see ball.gd), which sits right in
-	# front of the player's zone. Two things stop a split from instantly draining
-	# the player's lives:
-	#   1. Children are aimed INTO the arena (opposite the player's zone normal).
-	#   2. Their spawn points are spread apart along the edge so they don't stack
-	#      on one point — overlapping RigidBodies get flung apart by depenetration,
-	#      which used to hurl several straight down into the player's own zone.
-	var centre: Vector2 = get_design_centre()
-	var player_out: Vector2 = _zone_outward_dirs.get(player_colour, (pos - centre))
-	player_out = player_out.normalized()
-	if player_out == Vector2.ZERO:
-		player_out = Vector2.DOWN
-	var inward: Vector2  = -player_out
-	var along: Vector2   = Vector2(-inward.y, inward.x)   # perpendicular = along the edge
-	var base_angle: float = inward.angle()
+	# By now the ball has rebounded off the paddle and is out in the arena moving
+	# inward (see ball.gd's deferred split). Burst the children around its current
+	# travel direction, spread perpendicular to it so they don't spawn stacked on
+	# one point (overlapping RigidBodies get flung apart by depenetration).
+	var dir: Vector2 = vel.normalized()
+	if dir == Vector2.ZERO:
+		dir = (get_design_centre() - pos).normalized()
+	var base_angle: float = dir.angle()
+	var perp: Vector2     = Vector2(-dir.y, dir.x)
 
 	var child_sz: float     = max(0.4, sz * 0.75)
 	var child_radius: float = 16.0 * child_sz * _arena_scale
-	var spacing: float      = child_radius * 2.4
-	# Start a little inside the arena so nobody spawns touching the zone.
-	var base_pos: Vector2   = pos + inward * (24.0 * _arena_scale + child_radius)
+	var spacing: float      = child_radius * 2.2
 
 	for i in count:
 		var t: RigidBody2D = ball_scene.instantiate()
 		var lane: float = (float(i) - (count - 1) / 2.0) * spacing
-		t.position    = _safe_spawn_point(base_pos + along * lane)
+		t.position    = _safe_spawn_point(pos + perp * lane)
 		t.arena_scale = _arena_scale
 		t.set_colour(ct)
 		t.size_scale  = child_sz

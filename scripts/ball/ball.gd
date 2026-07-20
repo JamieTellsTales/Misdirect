@@ -51,6 +51,15 @@ const RAILGUN_MULT: float = 1.8
 const LAUNCH_DECAY: float = 1.2   # boost units lost per second
 var _launch_boost: float = 0.0    # extra multiplier above 1.0 on the speed cap
 
+# Deferred split — set when the ball hits the player's paddle with a split
+# power-up. The ball rebounds first, then bursts a moment later out in the
+# arena (looks natural, and can't drop children into the player's zone).
+var _split_pending: bool = false
+var _split_delay: float  = 0.0
+var _split_count: int    = 0
+var _split_spread: float = 0.0
+const SPLIT_REBOUND_DELAY: float = 0.12
+
 
 func _ready() -> void:
 	add_to_group("balls")
@@ -63,6 +72,9 @@ func _ready() -> void:
 	body_entered.connect(_on_body_entered)
 	contact_monitor = true
 	max_contacts_reported = 4
+	# Continuous collision so fast / small / launched balls can't tunnel through
+	# the thin paddle in one physics step (which skipped the bounce and split).
+	continuous_cd = RigidBody2D.CCD_MODE_CAST_RAY
 
 
 func set_random_size() -> void:
@@ -98,6 +110,14 @@ func _physics_process(delta: float) -> void:
 	_clamp_speed()
 	if split_cooldown > 0:
 		split_cooldown -= delta
+
+	# Fire a pending split once the ball has rebounded and cleared the paddle.
+	if _split_pending:
+		_split_delay -= delta
+		if _split_delay <= 0.0:
+			_split_pending = false
+			request_split.emit(self, _split_count, _split_spread)
+			return
 
 	# Record motion trail (global positions; drawn via to_local so rotation-safe)
 	_trail.append(global_position)
@@ -147,20 +167,19 @@ func _on_body_entered(body: Node) -> void:
 				call_deferred("_fire_railgun")
 
 			# ── Split power-ups ───────────────────────────────────────────
-			if can_split and split_cooldown <= 0.0:
+			# Arm a split; it fires shortly after, once the ball has rebounded
+			# out into the arena (see _physics_process). First matching slot wins.
+			if can_split and split_cooldown <= 0.0 and not _split_pending:
 				if GameConfig.has_power_up_in_slot("multi_shot"):
-					split_cooldown = 0.5
 					var count: int = randi_range(2, 5)
 					# Double Rebound synergy: doubles Multi Shot's output
 					if GameConfig.has_power_up_in_slot("double_rebound"):
 						count *= 2
-					request_split.emit(self, count, PI / 5.0)
+					_arm_split(count, PI / 5.0)
 				elif GameConfig.has_power_up_in_slot("clone"):
-					split_cooldown = 0.5
-					request_split.emit(self, 2, 0.05)
+					_arm_split(2, 0.05)
 				elif GameConfig.has_power_up_in_slot("double_rebound"):
-					split_cooldown = 0.5
-					request_split.emit(self, 2, PI / 5.0)
+					_arm_split(2, PI / 5.0)
 
 
 func _fire_railgun() -> void:
@@ -171,6 +190,15 @@ func _fire_railgun() -> void:
 		return
 	_launch_boost = RAILGUN_MULT - 1.0
 	linear_velocity = dir * max_speed * speed_multiplier * RAILGUN_MULT
+
+
+func _arm_split(count: int, spread: float) -> void:
+	## Queue a split to fire once the ball has rebounded off the paddle.
+	_split_pending = true
+	_split_delay   = SPLIT_REBOUND_DELAY
+	_split_count   = count
+	_split_spread  = spread
+	split_cooldown = 0.5
 
 
 func _draw() -> void:

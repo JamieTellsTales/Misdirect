@@ -217,8 +217,13 @@ signal ball_caught(ball: Ball)
   physics frame between size-scaled min/max.
 - Zones: `Area2D` outside the polygon edge (the wall is omitted on zone sides);
   `body_entered` = caught. Walls: `StaticBody2D` rectangles per polygon edge.
-- Ball splits: arena's `_on_ball_split` frees the original and spawns children with
-  divergent velocities; split children can't re-split (`can_split`).
+- Ball splits: a paddle hit *arms* the split on the ball (`_arm_split`); it fires
+  ~0.12s later once the ball has rebounded out into the arena (`_physics_process`
+  → `request_split`), so children burst mid-flight instead of at the player's
+  zone. Arena's `_do_ball_split` frees the original and spawns children spread
+  perpendicular to travel (non-overlapping) with divergent velocities; split
+  children can't re-split (`can_split`). Balls use `CCD_MODE_CAST_RAY` so fast
+  ones don't tunnel through the paddle (which skipped the bounce and split).
 
 ### Persistence
 - Everything saves through `ConfigFile` under `user://` — settings are
