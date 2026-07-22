@@ -723,7 +723,15 @@ func _setup_touch_controls() -> void:
 	## On-screen touch controls for the player paddle (no-op on non-touch devices).
 	var tc = load("res://scripts/ui/touch_controls.gd").new()
 	tc.paddle = paddles.get(player_colour)
+	tc.pause_requested.connect(_on_touch_pause)
 	add_child(tc)
+
+
+func _on_touch_pause() -> void:
+	if is_game_over or settings_overlay != null or pause_menu == null:
+		return
+	if not pause_menu.is_open:
+		pause_menu.open()
 
 
 # ── Input ──────────────────────────────────────────────────────────────────────
