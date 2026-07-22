@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://howtoplay1"]
+
+[ext_resource type="Script" path="res://scripts/ui/how_to_play.gd" id="1_howto"]
+
+[node name="HowToPlay" type="Node2D"]
+script = ExtResource("1_howto")

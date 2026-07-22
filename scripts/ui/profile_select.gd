@@ -100,7 +100,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					_rename_cursor_timer = 0.0
 			return  # Eat all other key input while renaming
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-			_handle_click(event.position)
+			_handle_click(get_global_mouse_position())
 		return
 
 	# ── Mouse wheel scroll ─────────────────────────────────────────────────────
@@ -116,15 +116,15 @@ func _unhandled_input(event: InputEvent) -> void:
 	# ── Mouse button press / release ───────────────────────────────────────────
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
-			_on_mouse_down(event.position)
+			_on_mouse_down(get_global_mouse_position())
 		else:
-			_on_mouse_up(event.position)
+			_on_mouse_up(get_global_mouse_position())
 		return
 
 	# ── Mouse motion ───────────────────────────────────────────────────────────
 	if event is InputEventMouseMotion:
-		_update_hover(event.position)
-		_update_drag(event.position)
+		_update_hover(get_global_mouse_position())
+		_update_drag(get_global_mouse_position())
 		return
 
 	if event.is_action_pressed("ui_cancel"):

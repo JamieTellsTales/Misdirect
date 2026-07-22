@@ -65,6 +65,16 @@ func _apply_personality() -> void:
 			prediction_strength = 0.5
 
 
+func enter_desperation() -> void:
+	## Elimination mode: called by arena.gd when this paddle drops to its last
+	## life. The AI plays scared — faster reactions, better accuracy, quicker
+	## movement — so a cornered zone is visibly harder to finish off.
+	reaction_delay      = maxf(0.03, reaction_delay * 0.5)
+	accuracy            = minf(0.98, accuracy + 0.15)
+	move_speed         *= 1.25
+	prediction_strength = minf(1.0, prediction_strength + 0.2)
+
+
 func _physics_process(delta: float) -> void:
 	reaction_timer += delta
 	if reaction_timer >= reaction_delay:
@@ -107,7 +117,7 @@ func _calculate_threat(ball: Node2D) -> float:
 	if approach_speed <= 0:
 		return -1.0
 
-	var threat: float = approach_speed / (distance + 100.0)
+	var threat: float = approach_speed / (distance + 100.0 * arena_scale)
 
 	# Blue panic: degrades accuracy when many balls are active.
 	if colour_type == ColourData.ColourType.BLUE:
@@ -129,7 +139,7 @@ func _calculate_target_offset() -> void:
 	if randf() > accuracy:
 		# Jitter perpendicular to the slide axis
 		var perp := move_direction.rotated(PI / 2.0)
-		predicted_pos += perp * randf_range(-100.0, 100.0)
+		predicted_pos += perp * randf_range(-100.0, 100.0) * arena_scale
 
 	target_offset = (predicted_pos - zone_centre).dot(move_direction)
 	target_offset = clampf(target_offset, min_offset, max_offset)
@@ -138,11 +148,11 @@ func _calculate_target_offset() -> void:
 func _move_toward_target(delta: float) -> void:
 	var dist: float = target_offset - get_slide_offset()
 
-	if abs(dist) < 5.0:
+	if abs(dist) < 5.0 * arena_scale:
 		velocity = Vector2.ZERO
 		return
 
-	velocity = move_direction * sign(dist) * move_speed
+	velocity = move_direction * sign(dist) * move_speed * arena_scale
 	move_and_slide()
 	# Snap back onto the constrained axis so collisions can't push us off-edge,
 	# but the along-edge position (collision-resolved) is preserved.

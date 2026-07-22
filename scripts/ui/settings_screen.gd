@@ -51,6 +51,7 @@ var font_left_rect:  Rect2 = Rect2()
 var font_right_rect: Rect2 = Rect2()
 var save_rect:       Rect2 = Rect2()
 var discard_rect:    Rect2 = Rect2()
+var colours_rect:    Rect2 = Rect2()
 
 # Slider track rects
 var sliders: Dictionary = {}  # name -> Rect2
@@ -114,6 +115,7 @@ func _on_mouse_move(pos: Vector2) -> void:
 	elif font_right_rect.has_point(pos):hover = "font_right"
 	elif save_rect.has_point(pos):      hover = "save"
 	elif discard_rect.has_point(pos):   hover = "discard"
+	elif colours_rect.has_point(pos):   hover = "colours"
 	else:
 		for sname in sliders:
 			if sliders[sname].has_point(pos):
@@ -148,6 +150,11 @@ func _on_left_down(pos: Vector2) -> void:
 		_save()
 	elif discard_rect.has_point(pos):
 		_discard()
+	elif colours_rect.has_point(pos) and not return_to_game:
+		# Commit current settings so nothing is lost, then open the colour screen.
+		_preview()
+		SettingsManager.save_settings()
+		get_tree().change_scene_to_file("res://scenes/colour_settings.tscn")
 	else:
 		for sname in sliders:
 			if sliders[sname].has_point(pos):
@@ -210,10 +217,32 @@ func _draw() -> void:
 	_CTRL_X  = _CX - 110.0
 	_draw_bg()
 	_draw_header()
+	_draw_colours_link()
 	_draw_display_section()
 	_draw_audio_section()
 	_draw_buttons()
 	CornerHUD.draw_on(self)
+
+
+func _draw_colours_link() -> void:
+	## Right-aligned link to the colour / accessibility screen (standalone only —
+	## changing zone colours mid-game would need an arena rebuild).
+	if return_to_game:
+		colours_rect = Rect2()
+		return
+	var font := FontManager.get_font()
+	var lbl := "Colours & Accessibility →"
+	var sz: int = 16
+	var w := font.get_string_size(lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
+	var right: float = _W - _LABEL_X
+	var bx: float = right - w - 14.0
+	var by: float = 96.0
+	colours_rect = Rect2(bx - 12.0, by - sz, w + 26.0, sz + 14.0)
+	var hov: bool = hover == "colours"
+	draw_rect(colours_rect, Color(0.14, 0.2, 0.28, 1.0) if hov else Color(0.1, 0.13, 0.2, 1.0))
+	draw_rect(colours_rect, Color(0.4, 0.6, 0.85, 0.8) if hov else Color(0.3, 0.4, 0.55, 0.6), false, 1.5)
+	draw_string(font, Vector2(bx, by + 4.0), lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, sz,
+		Color(0.7, 0.85, 1.0, 1.0) if hov else Color(0.55, 0.7, 0.9, 1.0))
 
 
 func _draw_bg() -> void:

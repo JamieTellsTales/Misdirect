@@ -10,6 +10,7 @@ var time_remaining: float = 0.0
 var is_running: bool = false
 var is_warning: bool = false
 var is_overtime: bool = false
+var final_countdown: bool = false  # Set by arena when the Final Countdown modifier is on
 
 
 func _ready() -> void:
@@ -49,7 +50,16 @@ func _draw() -> void:
 		var seconds: int = int(time_remaining) % 60
 		time_text = "%d:%02d" % [minutes, seconds]
 		text_color = Color.WHITE
-		if is_warning:
+		if final_countdown and time_remaining <= 10.0:
+			# Enlarged red text for the Final Countdown. A slow pulse by default;
+			# static (no flashing) under reduced motion.
+			font_size = 36
+			if SettingsManager.reduced_motion:
+				text_color = Color(1.0, 0.35, 0.3, 1.0)
+			else:
+				var pulse: float = (sin(Time.get_ticks_msec() / 260.0) + 1.0) / 2.0
+				text_color = Color(1.0, 0.85, 0.2, 1.0).lerp(Color(1.0, 0.3, 0.25, 1.0), pulse)
+		elif is_warning:
 			var pulse: float = (sin(Time.get_ticks_msec() / 150.0) + 1.0) / 2.0
 			text_color = Color.WHITE.lerp(Color.YELLOW, pulse)
 

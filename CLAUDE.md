@@ -34,19 +34,33 @@ The player always controls the **GREEN** paddle on the bottom edge (side 0). All
 other zones are AI-controlled paddles with per-colour personalities.
 
 ### Colours
-Defined in `scripts/resources/department_data.gd` (`ColourData`, `ColourType` enum):
+Defined in `scripts/resources/colour_data.gd` (`ColourData`, `ColourType` enum):
 BLUE, GREEN, RED, YELLOW, PURPLE, ORANGE, CYAN, PINK. Up to 8 players/zones.
+`ColourData.get_color(ct)` returns the player's accessibility override if set,
+else the default — overrides are palette indices into
+`ColourData.ACCESSIBLE_PALETTE` (colour-blind-safe Okabe-Ito set), stored
+device-level in `SettingsManager.zone_colours` and edited on the
+`colour_settings` screen (Settings → Colours & Accessibility). All UI/zones/
+balls resolve colour through `get_color`, so overrides apply on the next build.
+The colour screen enforces one colour per player and hosts the accessibility
+toggles `SettingsManager.reduced_motion` (gates shake/hit-stop/trails/flashing
+in arena.gd + ball.gd + round_timer_display.gd) and `ball_symbols` (draws
+`ColourData.draw_symbol` — a distinct shape per colour — on balls and zones).
 
 AI personalities live in `ai_paddle.gd::_apply_personality()` — each colour has its
 own `reaction_delay`, `accuracy`, `move_speed`, `prediction_strength`, plus quirks
 (RED deflects its own colour, YELLOW ignores purple, BLUE panics with many balls,
-PURPLE is slow and inaccurate).
+PURPLE is slow and inaccurate). In elimination, an AI on its last life gets
+`enter_desperation()` — sharper stats so cornered zones fight back.
 
 ### Game Modes (`GameConfig.game_mode`)
 - **normal** — timed round (`round_duration`, default 120s). Highest score wins;
   ties are draws. Wrong catch deducts score (floor 0).
 - **endless** — no timer. Player has 3 lives; wrong catch costs a life (not score);
   +1 life per 100 points milestone. Game ends when lives hit 0 (`_end_round(true)`).
+  Difficulty ramps: spawn interval shrinks 2% per 10s (floor 40%).
+  Endless never counts toward wins/draws/losses and always pays tokens at the
+  full (win) rate — longest run and high score are its success metrics.
 - **elimination** — no timer. Every zone has 3 lives. At 0 lives, the zone is
   collapsed (`_collapse_zone`): paddle/zone/score display removed and the edge is
   sealed with a wall. Player collapse ends the game; otherwise last zone standing wins.
@@ -55,9 +69,10 @@ Lives are drawn as dots near each score display (`_draw_lives` in arena.gd).
 
 ### Balls
 - Random size 0.5–2.0; smaller = faster, bigger = more points (10–30).
-- Wrong-catch penalty chain exists on the ball (`apply_wrong_catch_penalty`:
-  speed-up, then blame stamp) **but is currently never called** — zones destroy
-  every ball they catch. Known gap vs the original design.
+- Every catch destroys the ball by default. With the **return_to_sender**
+  modifier, wrong catches instead apply the penalty chain
+  (`apply_wrong_catch_penalty`: speed-up, then blame stamp) and reflect the
+  ball back into the arena (`_bounce_back` in colour_zone.gd).
 
 ### Maps & Player Counts
 `GameConfig.MAP_VALID_PLAYERS` / `MAP_ZONE_SIDES` define which polygon sides are
@@ -67,14 +82,21 @@ heptagon, octagon. Maps unlock via wins on the previous map
 
 ### Power-Ups & Modifiers
 - **Power-ups** (`GameConfig.POWER_UPS`) are bought with tokens in the shop and
-  assigned to up to 3 slots pre-game (`power_up_slots`). Slots unlock by level +
-  token fee (`POWER_UP_SLOT_DEFS`; keys SPACE/Q/E). Hold-key power-ups (gravity,
-  anti_gravity, cyclone) are handled in `player_paddle.gd`; on-hit power-ups
-  (railgun, splits, deflector) in `ticket.gd` / `paddle.gd`.
+  assigned to 3 pre-game slots (`power_up_slots`). Each power-up has a `kind`:
+  **active** (hold-key: gravity, anti_gravity, cyclone — handled in
+  `player_paddle.gd`) or **passive** (automatic/always-on: railgun, splits,
+  deflector — in `ball.gd` / `paddle.gd`). Slot 0 is the single ACTIVE slot
+  (hold SPACE), free from the start; slots 1-2 are PASSIVE slots unlocked by
+  level + token fee (`POWER_UP_SLOT_DEFS`). The pre-game picker only offers
+  power-ups whose kind matches the slot.
 - **Modifiers** (`GameConfig.MODIFIERS`) are free toggles unlocked by level:
   rotated_colours, chaos_ball, load_balanced, random_directions, extra_time,
-  final_countdown, speed_ball, black_hole, gravity_wells, pillars. Implemented
-  in arena.gd (spawn logic, `_tick_black_hole`, `_tick_gravity_well`, pillars).
+  final_countdown, return_to_sender, speed_ball, erratic_balls, black_hole,
+  surge_balls, gravity_wells, pillars. Implemented in arena.gd (spawn logic,
+  `_tick_black_hole`, `_tick_gravity_well`, pillars), colour_zone.gd
+  (return_to_sender), and ball.gd (erratic_balls, surge_balls).
+- Split power-ups don't stack as separate splits — Multi Shot takes priority,
+  and Double Rebound doubles Multi Shot's output when both are equipped.
 
 ---
 
@@ -91,34 +113,30 @@ heptagon, octagon. Maps unlock via wins on the previous map
 | `FontManager`     | Serves the accessibility font (`get_font()`); all UI uses this instead of ThemeDB. |
 | `StatsManager`    | Per-profile lifetime stats (per-mode high scores/game counts, wins/draws/losses, tokens + total earned, XP/level, unlocks). Persists via ConfigFile per profile. |
 
-Note: `scripts/autoload/score_manager.gd`, `scripts/ui/queue_display.gd`,
-`scripts/resources/ticket_data.gd` are **legacy from the original ticket/SLA
-design and are not registered or used**.
-
 ### Scene Flow
 ```
 main_menu → mode_select → map_select → pre_game_config → arena
                                                             ├─ pause_menu (overlay, ESC)
                                                             │    └─ settings_screen (overlay; reloads arena on exit)
                                                             └─ game_over (overlay) → replay arena / main_menu
-main_menu also → settings_screen, stats_screen, shop, profile_select/profile_setup
+main_menu also → how_to_play, settings_screen (→ colour_settings), stats_screen, shop, profile_select/profile_setup
 ```
 First run with no profiles jumps straight to profile_setup.
 
 ### Key Scripts
 ```
 scripts/
-├── autoload/            # See table above (+ legacy score_manager.gd)
+├── autoload/            # See table above
 ├── arena/
 │   ├── arena.gd         # THE core script: builds polygon, walls, zones, paddles,
 │   │                    #   spawning, modifiers, lives/collapse, round lifecycle
-│   └── department_zone.gd  # ColourZone Area2D: catch detection, score_up/score_down/wrong_catch signals
-├── ticket/ticket.gd     # Ball (RigidBody2D): size/speed, splits, on-hit power-ups
+│   └── colour_zone.gd   # ColourZone Area2D: catch detection, score_up/score_down/wrong_catch signals
+├── ball/ball.gd         # Ball (RigidBody2D): size/speed, splits, on-hit power-ups
 ├── paddle/
 │   ├── paddle.gd        # Base CharacterBody2D: slide axis, collision shape, deflector triangle
 │   ├── player_paddle.gd # Input + hold-key power-ups
 │   └── ai_paddle.gd     # Threat targeting + per-colour personality
-├── resources/department_data.gd  # ColourData: colours, names, enum
+├── resources/colour_data.gd  # ColourData: colours, names, enum
 └── ui/                  # One script per screen; all custom-drawn (see UI conventions)
 ```
 
@@ -164,7 +182,7 @@ func catch_ball(ball: Ball) -> void:
 @onready var collision: CollisionShape2D = $CollisionShape2D
 
 # Signals use past tense
-signal ticket_caught(ball: Ball)
+signal ball_caught(ball: Ball)
 ```
 
 ### UI Conventions (important — all screens follow this pattern)
@@ -185,6 +203,13 @@ signal ticket_caught(ball: Ball)
   scale, **`event.position` (window px) ≠ canvas coordinates**. For hit-testing
   against rects computed in `_draw()`, use `get_global_mouse_position()` —
   this bug has bitten pause_menu and settings_screen before.
+- Touch: `touch_controls.gd` (added to the arena, shown only when
+  `DisplayServer.is_touchscreen_available()`) handles `InputEventScreenTouch/Drag`
+  — drag to move the paddle, hold the corner button for the active power-up.
+  It converts touch `event.position` to world space with
+  `get_canvas_transform().affine_inverse() * pos` (the touch analogue of
+  `get_global_mouse_position()`), and feeds the paddle via `touch_move_to()` /
+  `touch_powerup_held`. Multitouch uses `event.index` so move + power-up work at once.
 - **Portrait mode**: arena.gd scales the polygon to fill the canvas width and
   stores `_arena_scale` (~2.1× on phone portrait). Every size/speed/force
   constant used in the arena must be multiplied by `_arena_scale` (balls take it
@@ -197,8 +222,9 @@ signal ticket_caught(ball: Ball)
   always `get_tree().paused = false` before reloading or leaving.
 - game_over_screen and pause overlays use `PROCESS_MODE_ALWAYS`; the arena pauses
   the tree when results show.
-- Closing settings mid-game reloads the arena scene (physics nodes can't be
-  repositioned safely after a resolution change) — this restarts the round.
+- Closing settings mid-game returns to the pause menu without reloading —
+  the round keeps its state. Resolution changes apply live; the arena keeps
+  the geometry it was built with (fine for same-aspect changes).
 
 ### Physics
 - Paddles: `CharacterBody2D`, moved along a slide axis (`move_direction`,
@@ -208,8 +234,13 @@ signal ticket_caught(ball: Ball)
   physics frame between size-scaled min/max.
 - Zones: `Area2D` outside the polygon edge (the wall is omitted on zone sides);
   `body_entered` = caught. Walls: `StaticBody2D` rectangles per polygon edge.
-- Ball splits: arena's `_on_ball_split` frees the original and spawns children with
-  divergent velocities; split children can't re-split (`can_split`).
+- Ball splits: a paddle hit *arms* the split on the ball (`_arm_split`); it fires
+  ~0.12s later once the ball has rebounded out into the arena (`_physics_process`
+  → `request_split`), so children burst mid-flight instead of at the player's
+  zone. Arena's `_do_ball_split` frees the original and spawns children spread
+  perpendicular to travel (non-overlapping) with divergent velocities; split
+  children can't re-split (`can_split`). Balls use `CCD_MODE_CAST_RAY` so fast
+  ones don't tunnel through the paddle (which skipped the bounce and split).
 
 ### Persistence
 - Everything saves through `ConfigFile` under `user://` — settings are
@@ -217,5 +248,15 @@ signal ticket_caught(ball: Ball)
 - When adding a stat: add the var, default it in `load_stats()`, read it there,
   write it in `save_stats()`, and update it in `record_game_end()` if per-game.
 
+### Juice / feedback (arena.gd)
+- Screen shake uses `get_viewport().canvas_transform` (NOT a Camera2D). Hit-stop
+  uses `Engine.time_scale`. Both are global, so `_clear_feedback()` resets them
+  in `_end_round`/`_restart_game`/`_quit_game`/`_start_round` — the results
+  overlay pauses the tree, which would otherwise freeze them mid-effect.
+- Transient effects (`_life_popups`, `_collapse_bursts`) tick in `_tick_feedback`
+  (called before the `is_game_over` guard so they can finish) and draw in `_draw`.
+- Balls draw a fading motion trail; paddles flash red via `hit_flash()` on life loss.
+
 ### Performance
 - Balls capped via `max_balls` (default 10) checked in `_try_spawn_ball()`.
+- Balls `queue_redraw()` every physics frame (motion trail needs it).

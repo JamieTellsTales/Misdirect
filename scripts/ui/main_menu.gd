@@ -4,9 +4,10 @@ class_name MainMenu
 
 const CornerHUD = preload("res://scripts/ui/corner_hud.gd")
 
-const MENU_ITEMS: Array = ["PLAY", "SETTINGS", "STATS", "UNLOCKS", "ACHIEVEMENTS", "EXIT"]
+const MENU_ITEMS: Array = ["PLAY", "HOW TO PLAY", "SETTINGS", "STATS", "UNLOCKS", "ACHIEVEMENTS", "EXIT"]
 const MENU_COLORS: Array = [
 	Color.FOREST_GREEN,
+	Color(0.3, 0.8, 0.8, 1.0),
 	Color.DODGER_BLUE,
 	Color.CORAL,
 	Color(0.65, 0.4, 0.9, 1.0),
@@ -15,7 +16,7 @@ const MENU_COLORS: Array = [
 ]
 
 var selected_index: int = 0
-var popup_state: int = 0  # 0 = none, 4 = achievements
+var popup_state: int = 0  # 0 = none, 5 = achievements (index into MENU_ITEMS)
 var _prev_selected_index: int = -1
 
 var title_pulse: float = 0.0
@@ -47,10 +48,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event is InputEventMouseMotion:
-		_update_hover(event.position)
+		_update_hover(get_global_mouse_position())
 
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_handle_click(event.position)
+		_handle_click(get_global_mouse_position())
 
 	if event.is_action_pressed("ui_up") or event.is_action_pressed("move_up"):
 		selected_index = (selected_index - 1 + MENU_ITEMS.size()) % MENU_ITEMS.size()
@@ -89,14 +90,16 @@ func _activate(index: int) -> void:
 			GameConfig.reset()
 			get_tree().change_scene_to_file("res://scenes/mode_select.tscn")
 		1:
-			get_tree().change_scene_to_file("res://scenes/settings_screen.tscn")
+			get_tree().change_scene_to_file("res://scenes/how_to_play.tscn")
 		2:
-			get_tree().change_scene_to_file("res://scenes/stats_screen.tscn")
+			get_tree().change_scene_to_file("res://scenes/settings_screen.tscn")
 		3:
-			get_tree().change_scene_to_file("res://scenes/shop.tscn")
+			get_tree().change_scene_to_file("res://scenes/stats_screen.tscn")
 		4:
-			popup_state = 4
+			get_tree().change_scene_to_file("res://scenes/shop.tscn")
 		5:
+			popup_state = 5
+		6:
 			get_tree().quit()
 
 
@@ -134,7 +137,7 @@ func _draw_background() -> void:
 	for i in range(dec_points.size()):
 		draw_line(dec_points[i], dec_points[(i + 1) % dec_points.size()], dec_color, 1.5)
 
-	# Subtle coloured corner accents matching department colours
+	# Subtle coloured corner accents matching zone colours
 	var corner_alpha: float = 0.12
 	draw_circle(Vector2(0, 0), 200, Color(Color.DODGER_BLUE, corner_alpha))
 	draw_circle(Vector2(sw, 0), 200, Color(Color.CRIMSON, corner_alpha))

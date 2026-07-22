@@ -171,15 +171,18 @@ func record_game_end(player_score: int, time_seconds: float, player_won: bool, p
 	var xp_earned: int = player_score
 	xp = mini(xp + xp_earned, 999 * 100)
 
-	if player_won:
-		wins += 1
-		# Track wins per map for unlock progression
-		var map_key: String = GameConfig.selected_map
-		map_wins[map_key] = map_wins.get(map_key, 0) + 1
-	elif player_drew:
-		draws += 1
-	else:
-		losses += 1
+	# Endless is a survival mode — the run always ends in death, so it does not
+	# count toward wins/draws/losses (longest run + high score are its metrics).
+	if mode != "endless":
+		if player_won:
+			wins += 1
+			# Track wins per map for unlock progression
+			var map_key: String = GameConfig.selected_map
+			map_wins[map_key] = map_wins.get(map_key, 0) + 1
+		elif player_drew:
+			draws += 1
+		else:
+			losses += 1
 
 	var is_new_high_score: bool = player_score > high_score
 	if is_new_high_score:
@@ -195,9 +198,10 @@ func record_game_end(player_score: int, time_seconds: float, player_won: bool, p
 			if player_score > high_score_elimination:
 				high_score_elimination = player_score
 
-	# Tokens: 1 per 100 score; halved (integer division) on loss
+	# Tokens: 1 per 100 score; halved (integer division) on loss.
+	# Endless always pays full rate — dying is the only way a run ends.
 	var tokens_earned: int = player_score / 100
-	if not player_won:
+	if not player_won and mode != "endless":
 		tokens_earned = tokens_earned / 2
 	tokens             += tokens_earned
 	total_tokens_earned += tokens_earned
@@ -276,7 +280,11 @@ func unlock_powerup(id: String, price: int) -> bool:
 
 
 func is_slot_unlocked(slot_idx: int) -> bool:
-	## Returns true if the player has paid the token fee to unlock this slot.
+	## Returns true if this slot is available. Free slots (unlock_price 0, e.g. the
+	## always-available active slot) count as unlocked without purchase.
+	if slot_idx >= 0 and slot_idx < GameConfig.POWER_UP_SLOT_DEFS.size():
+		if GameConfig.POWER_UP_SLOT_DEFS[slot_idx].get("unlock_price", 0) <= 0:
+			return true
 	return slot_idx in unlocked_slots
 
 

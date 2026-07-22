@@ -39,7 +39,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed:
 		match event.button_index:
 			MOUSE_BUTTON_LEFT:
-				if _back_rect.has_point(event.position):
+				if _back_rect.has_point(get_global_mouse_position()):
 					AudioManager.play_button_click()
 					get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 			MOUSE_BUTTON_WHEEL_UP:

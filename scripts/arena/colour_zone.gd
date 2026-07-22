@@ -3,7 +3,7 @@ class_name ColourZone
 ## A zone at the edge of the arena belonging to a colour
 ## Balls entering this zone score points (correct colour) or lose points (wrong colour)
 
-const ColourData = preload("res://scripts/resources/department_data.gd")
+const ColourData = preload("res://scripts/resources/colour_data.gd")
 
 signal score_up(colour_type: int, points: int)
 signal score_down(colour_type: int, points: int)
@@ -13,7 +13,6 @@ signal wrong_catch(ball: Node2D, colour_type: int)
 @export var zone_depth: float = 60.0
 
 var zone_color: Color
-var is_collapsed: bool = false
 
 # Flash effects
 var flash_timer: float = 0.0
@@ -57,18 +56,13 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	var bg_color: Color
-	if is_collapsed:
-		bg_color = Color.DARK_GRAY
-		bg_color.a = 0.5
-	elif is_flashing:
+	if is_flashing:
 		var flash_intensity: float = flash_timer / 0.3
 		bg_color = zone_color.lerp(flash_color, flash_intensity * 0.6)
 	else:
 		bg_color = zone_color
 
 	var border_color: Color = ColourData.get_color(colour_type)
-	if is_collapsed:
-		border_color = Color.DARK_GRAY
 	border_color.a = 0.8
 
 	if draw_vertices.size() >= 4:
@@ -76,6 +70,13 @@ func _draw() -> void:
 		var outline := draw_vertices.duplicate()
 		outline.append(draw_vertices[0])
 		draw_polyline(outline, border_color, 3.0)
+		# Accessibility: the zone's identifying symbol at its centre.
+		if SettingsManager.ball_symbols:
+			var centroid: Vector2 = (draw_vertices[0] + draw_vertices[1] + draw_vertices[2] + draw_vertices[3]) / 4.0
+			var depth: float = draw_vertices[0].distance_to(draw_vertices[3])
+			var sym_col: Color = ColourData.get_color(colour_type)
+			sym_col.a = 0.9
+			ColourData.draw_symbol(self, colour_type, centroid, depth * 0.28, sym_col)
 	else:
 		# Fallback rect (used before set_draw_shape is called)
 		var col_shape := get_node_or_null("CollisionShape2D")
@@ -87,8 +88,6 @@ func _draw() -> void:
 
 
 func _on_body_entered(body: Node2D) -> void:
-	if is_collapsed:
-		return
 	if body.is_in_group("balls"):
 		_handle_ball(body)
 
@@ -101,13 +100,35 @@ func _handle_ball(ball: Node2D) -> void:
 		_flash(Color.GREEN)
 		score_up.emit(colour_type, points)
 		AudioManager.play_correct_catch()
+		ball.queue_free()
 	else:
 		_flash(Color.RED)
 		score_down.emit(colour_type, points)
 		wrong_catch.emit(ball, colour_type)
 		AudioManager.play_wrong_catch()
+		if GameConfig.has_modifier("return_to_sender"):
+			# Wrong-caught balls are not destroyed — they re-enter play faster
+			# each time (speed-up chain, blame stamp on the third catch).
+			ball.apply_wrong_catch_penalty()
+			_bounce_back(ball)
+		else:
+			ball.queue_free()
 
-	ball.queue_free()
+
+func _bounce_back(ball: Node2D) -> void:
+	## Reflect the ball back into the arena about this zone's edge normal.
+	## Zone local +Y is the outward direction (set by arena.gd via rotation).
+	var outward: Vector2 = global_transform.y.normalized()
+	var v: Vector2 = ball.linear_velocity
+	if v.dot(outward) > 0.0:
+		v = v - 2.0 * v.dot(outward) * outward
+	# Guarantee a real inward component so near-parallel hits can't linger
+	# inside the zone and immediately re-trigger.
+	var min_inward: float = 50.0 * ball.arena_scale
+	var inward_speed: float = -v.dot(outward)
+	if inward_speed < min_inward:
+		v += -outward * (min_inward - inward_speed)
+	ball.linear_velocity = v
 
 
 func _flash(color: Color) -> void:
@@ -115,17 +136,6 @@ func _flash(color: Color) -> void:
 	flash_timer = 0.3
 	flash_color = color
 	queue_redraw()
-
-
-func collapse() -> void:
-	is_collapsed = true
-	zone_color = Color.DARK_GRAY
-	zone_color.a = 0.5
-	queue_redraw()
-
-
-func is_zone_collapsed() -> bool:
-	return is_collapsed
 
 
 func get_zone_color() -> Color:

@@ -48,7 +48,7 @@ func _process(_delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
-		var pos: Vector2 = event.position
+		var pos: Vector2 = get_global_mouse_position()
 		_hover_confirm = _confirm_rect.has_point(pos)
 		_hover_back    = _back_rect.has_point(pos)
 		for i in _card_rects.size():
@@ -59,7 +59,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		var pos: Vector2 = event.position
+		var pos: Vector2 = get_global_mouse_position()
 		for i in _card_rects.size():
 			if _card_rects[i].has_point(pos):
 				selected_index = i

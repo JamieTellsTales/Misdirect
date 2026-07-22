@@ -9,10 +9,16 @@ const CARD_W:   float = 260.0
 const CARD_H:   float = 150.0
 const CARD_GAP: float = 24.0
 const COLS:     int   = 2
+const PAGE_ROWS: int  = 3
+const CARDS_PER_PAGE: int = COLS * PAGE_ROWS   # 6 cards per page
 
 var _buy_rects: Array = []  # Array of {rect: Rect2, id: String, price: int}
 var _back_rect: Rect2 = Rect2()
+var _prev_rect: Rect2 = Rect2()
+var _next_rect: Rect2 = Rect2()
 var _hover_rect_id: String = ""   # tracks which rect is hovered for sound
+var _page: int = 0
+var _total_pages: int = 1
 
 
 func _ready() -> void:
@@ -29,17 +35,33 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 		return
 
+	if event.is_action_pressed("ui_right") or event.is_action_pressed("move_right"):
+		_change_page(1)
+	if event.is_action_pressed("ui_left") or event.is_action_pressed("move_left"):
+		_change_page(-1)
+
 	if event is InputEventMouseMotion:
-		_update_hover(event.position)
+		_update_hover(get_global_mouse_position())
 
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_handle_click(event.position)
+		_handle_click(get_global_mouse_position())
+
+
+func _change_page(delta: int) -> void:
+	var new_page: int = clampi(_page + delta, 0, _total_pages - 1)
+	if new_page != _page:
+		_page = new_page
+		AudioManager.play_button_click()
 
 
 func _update_hover(pos: Vector2) -> void:
 	var new_id: String = ""
 	if _back_rect.has_point(pos):
 		new_id = "__back"
+	elif _total_pages > 1 and _page > 0 and _prev_rect.has_point(pos):
+		new_id = "__prev"
+	elif _total_pages > 1 and _page < _total_pages - 1 and _next_rect.has_point(pos):
+		new_id = "__next"
 	else:
 		for entry in _buy_rects:
 			if entry.rect.has_point(pos):
@@ -54,6 +76,13 @@ func _handle_click(pos: Vector2) -> void:
 	if _back_rect.has_point(pos):
 		AudioManager.play_button_click()
 		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+		return
+
+	if _total_pages > 1 and _page > 0 and _prev_rect.has_point(pos):
+		_change_page(-1)
+		return
+	if _total_pages > 1 and _page < _total_pages - 1 and _next_rect.has_point(pos):
+		_change_page(1)
 		return
 
 	for entry in _buy_rects:
@@ -82,12 +111,15 @@ func _draw() -> void:
 		if pu["id"] != "":
 			paid_pus.append(pu)
 
-	var rows: int = ceili(float(paid_pus.size()) / float(COLS))
+	_total_pages = maxi(1, ceili(float(paid_pus.size()) / float(CARDS_PER_PAGE)))
+	_page = clampi(_page, 0, _total_pages - 1)
+
+	# Panel is a fixed size (one full page) so it doesn't resize between pages.
 	var grid_w: float = COLS * CARD_W + (COLS - 1) * CARD_GAP
-	var grid_h: float = rows * CARD_H + maxf(0, rows - 1) * CARD_GAP
+	var grid_h: float = PAGE_ROWS * CARD_H + (PAGE_ROWS - 1) * CARD_GAP
 
 	var panel_w: float = grid_w + 64.0
-	var panel_h: float = 88.0 + grid_h + 64.0
+	var panel_h: float = 88.0 + grid_h + 76.0   # header + grid + page controls/footer
 	var px: float = cx - panel_w / 2.0
 	var py: float = cy - panel_h / 2.0
 
@@ -117,17 +149,46 @@ func _draw() -> void:
 		Color(0.4, 0.4, 0.5, 0.7), 1.0
 	)
 
-	# Card grid
+	# Card grid — current page only
 	_buy_rects.clear()
 	var grid_start_x: float = cx - grid_w / 2.0
 	var grid_start_y: float = py + 78.0
 
-	for i in paid_pus.size():
-		var col_idx: int = i % COLS
-		var row_idx: int = i / COLS
+	var start: int = _page * CARDS_PER_PAGE
+	var end_i: int = mini(start + CARDS_PER_PAGE, paid_pus.size())
+	for i in range(start, end_i):
+		var slot: int = i - start
+		var col_idx: int = slot % COLS
+		var row_idx: int = slot / COLS
 		var card_x: float = grid_start_x + col_idx * (CARD_W + CARD_GAP)
 		var card_y: float = grid_start_y + row_idx * (CARD_H + CARD_GAP)
 		_draw_card(font, paid_pus[i], card_x, card_y)
+
+	# Page controls (only when there's more than one page)
+	if _total_pages > 1:
+		var pc_y: float = grid_start_y + grid_h + 26.0
+		var page_lbl := "Page %d / %d" % [_page + 1, _total_pages]
+		var pl_sz := 16
+		var pl_w := font.get_string_size(page_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, pl_sz).x
+		draw_string(font, Vector2(cx - pl_w / 2.0, pc_y), page_lbl,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, pl_sz, Color(0.7, 0.72, 0.82, 1.0))
+
+		var nav_sz := 16
+		var prev_lbl := "‹ PREV"
+		var prev_w := font.get_string_size(prev_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, nav_sz).x
+		var prev_x := cx - pl_w / 2.0 - 28.0 - prev_w
+		_prev_rect = Rect2(prev_x - 10.0, pc_y - nav_sz, prev_w + 20.0, nav_sz + 10.0)
+		var prev_on := _page > 0
+		draw_string(font, Vector2(prev_x, pc_y), prev_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, nav_sz,
+			(Color(0.6, 0.75, 0.95, 1.0) if _hover_rect_id == "__prev" else Color(0.5, 0.6, 0.8, 1.0)) if prev_on else Color(0.3, 0.3, 0.38, 1.0))
+
+		var next_lbl := "NEXT ›"
+		var next_x := cx + pl_w / 2.0 + 28.0
+		var next_w := font.get_string_size(next_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, nav_sz).x
+		_next_rect = Rect2(next_x - 10.0, pc_y - nav_sz, next_w + 20.0, nav_sz + 10.0)
+		var next_on := _page < _total_pages - 1
+		draw_string(font, Vector2(next_x, pc_y), next_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, nav_sz,
+			(Color(0.6, 0.75, 0.95, 1.0) if _hover_rect_id == "__next" else Color(0.5, 0.6, 0.8, 1.0)) if next_on else Color(0.3, 0.3, 0.38, 1.0))
 
 	# Back button
 	var back_lbl  := "← BACK"
@@ -140,7 +201,7 @@ func _draw() -> void:
 		back_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, back_size, Color(0.45, 0.55, 0.75, 1.0))
 
 	# ESC hint
-	var hint      := "ESC — back"
+	var hint      := "← →  change page     ESC — back" if _total_pages > 1 else "ESC — back"
 	var hint_size := 13
 	var hint_w    := font.get_string_size(hint, HORIZONTAL_ALIGNMENT_LEFT, -1, hint_size).x
 	draw_string(font, Vector2(cx - hint_w / 2.0, sh - 24.0),
@@ -171,6 +232,17 @@ func _draw_card(font: Font, pu: Dictionary, x: float, y: float) -> void:
 	var name_col  := Color(0.75, 0.95, 0.78, 1.0) if owned else Color(0.88, 0.88, 0.96, 1.0)
 	draw_string(font, Vector2(x + 14, y + 28),
 		pu["label"], HORIZONTAL_ALIGNMENT_LEFT, -1, name_size, name_col)
+
+	# ACTIVE / PASSIVE tag (top-right)
+	var kind: String = pu.get("kind", "")
+	if kind != "":
+		var tag: String = "ACTIVE" if kind == "active" else "PASSIVE"
+		var tag_col: Color = Color(0.5, 0.75, 1.0, 1.0) if kind == "active" else Color(0.75, 0.6, 0.95, 1.0)
+		var tag_sz: int = 11
+		var tag_w := font.get_string_size(tag, HORIZONTAL_ALIGNMENT_LEFT, -1, tag_sz).x
+		var tag_x := x + CARD_W - tag_w - 12.0
+		draw_rect(Rect2(tag_x - 5.0, y + 10.0, tag_w + 10.0, 16.0), Color(tag_col.r, tag_col.g, tag_col.b, 0.14))
+		draw_string(font, Vector2(tag_x, y + 22.0), tag, HORIZONTAL_ALIGNMENT_LEFT, -1, tag_sz, tag_col)
 
 	# Description (word-wrapped)
 	var desc_col := Color(0.5, 0.65, 0.52, 1.0) if owned else Color(0.45, 0.45, 0.58, 1.0)
