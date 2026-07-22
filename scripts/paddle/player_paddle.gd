@@ -12,6 +12,22 @@ var gravity_active:      bool = false
 var antigravity_active:  bool = false
 var cyclone_active:      bool = false
 
+# Touch control (set by TouchControls). The paddle tracks a finger's position
+# and its active power-up can be held via the on-screen button.
+const TOUCH_FOLLOW_MULT: float = 2.6   # how much faster than move_speed touch tracks
+var touch_powerup_held: bool = false
+var _touch_move_active: bool = false
+var _touch_world_pos:   Vector2 = Vector2.ZERO
+
+
+func touch_move_to(world_pos: Vector2) -> void:
+	_touch_move_active = true
+	_touch_world_pos = world_pos
+
+
+func touch_move_end() -> void:
+	_touch_move_active = false
+
 
 func _ready() -> void:
 	super._ready()
@@ -21,21 +37,21 @@ func _ready() -> void:
 		move_speed *= 2.0
 
 
-func _physics_process(_delta: float) -> void:
-	var input_dir := _get_input_direction()
+func _physics_process(delta: float) -> void:
+	if _touch_move_active:
+		_track_touch(delta)
+	else:
+		var input_dir := _get_input_direction()
+		# Physics velocity so the CharacterBody2D velocity is correct for deflection.
+		velocity = move_direction * input_dir * move_speed * arena_scale
+		move_and_slide()
+		# Snap back onto the constrained axis (move_and_slide can drift).
+		set_slide_offset(get_slide_offset())
 
-	# Move along move_direction (always horizontal for player) with physics velocity
-	# so the CharacterBody2D velocity is correct for deflection response.
-	velocity = move_direction * input_dir * move_speed * arena_scale
-	move_and_slide()
-
-	# Snap back onto the constrained axis (move_and_slide can drift).
-	set_slide_offset(get_slide_offset())
-
-	# Hold-activated power-ups: check each slot key.
-	gravity_active     = _is_slot_key_held("gravity")
-	antigravity_active = _is_slot_key_held("anti_gravity")
-	cyclone_active     = _is_slot_key_held("cyclone")
+	# Hold-activated power-ups: keyboard key OR the on-screen touch button.
+	gravity_active     = _is_powerup_held("gravity")
+	antigravity_active = _is_powerup_held("anti_gravity")
+	cyclone_active     = _is_powerup_held("cyclone")
 
 	if gravity_active:
 		_apply_gravity()
@@ -44,6 +60,25 @@ func _physics_process(_delta: float) -> void:
 	if cyclone_active:
 		_apply_cyclone()
 	queue_redraw()
+
+
+func _track_touch(delta: float) -> void:
+	## Move toward the touched position along the slide axis, capped so a fast
+	## drag stays responsive without teleporting. Velocity is kept accurate for
+	## the ball's deflection blend.
+	var target: float = clampf((_touch_world_pos - zone_centre).dot(move_direction), min_offset, max_offset)
+	var cur: float = get_slide_offset()
+	var max_step: float = move_speed * TOUCH_FOLLOW_MULT * arena_scale * delta
+	var step: float = clampf(target - cur, -max_step, max_step)
+	velocity = move_direction * (step / maxf(delta, 0.0001))
+	set_slide_offset(cur + step)
+
+
+func _is_powerup_held(pu_id: String) -> bool:
+	if touch_powerup_held and not GameConfig.power_up_slots.is_empty() \
+			and GameConfig.power_up_slots[0] == pu_id:
+		return true
+	return _is_slot_key_held(pu_id)
 
 
 func _get_input_direction() -> float:

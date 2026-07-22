@@ -116,6 +116,7 @@ func _ready() -> void:
 	_setup_game_over_screen()
 	_setup_pause_menu()
 	_setup_pillars()
+	_setup_touch_controls()
 	_start_round()
 
 
@@ -716,6 +717,13 @@ func _setup_pause_menu() -> void:
 	pause_menu.settings_requested.connect(_on_pause_settings)
 	pause_menu.exit_requested.connect(_on_pause_exit)
 	add_child(pause_menu)
+
+
+func _setup_touch_controls() -> void:
+	## On-screen touch controls for the player paddle (no-op on non-touch devices).
+	var tc = load("res://scripts/ui/touch_controls.gd").new()
+	tc.paddle = paddles.get(player_colour)
+	add_child(tc)
 
 
 # ── Input ──────────────────────────────────────────────────────────────────────

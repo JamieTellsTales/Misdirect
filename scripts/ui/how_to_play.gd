@@ -56,6 +56,13 @@ func _draw() -> void:
 	var gw := font.get_string_size(tagline, HORIZONTAL_ALIGNMENT_LEFT, -1, gsz).x
 	draw_string(font, Vector2(cx - gw / 2.0, 96), tagline, HORIZONTAL_ALIGNMENT_LEFT, -1, gsz, Color(0.6, 0.7, 0.8, 1.0))
 
+	# Controls hint — touch vs keyboard
+	var ctrl := "Touch: drag to move, hold the button for your power-up." if DisplayServer.is_touchscreen_available() \
+		else "Move with ← → or A / D.  Hold SPACE for your active power-up."
+	var csz: int = 13
+	var cw := font.get_string_size(ctrl, HORIZONTAL_ALIGNMENT_LEFT, -1, csz).x
+	draw_string(font, Vector2(cx - cw / 2.0, 120), ctrl, HORIZONTAL_ALIGNMENT_LEFT, -1, csz, Color(0.5, 0.6, 0.72, 1.0))
+
 	# Diagram on the left, rules on the right
 	_draw_diagram(font, Vector2(90.0, 140.0), 380.0)
 	_draw_rules(font, Vector2(540.0, 150.0), sw - 540.0 - 70.0)

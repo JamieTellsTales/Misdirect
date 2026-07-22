@@ -203,6 +203,13 @@ signal ball_caught(ball: Ball)
   scale, **`event.position` (window px) ≠ canvas coordinates**. For hit-testing
   against rects computed in `_draw()`, use `get_global_mouse_position()` —
   this bug has bitten pause_menu and settings_screen before.
+- Touch: `touch_controls.gd` (added to the arena, shown only when
+  `DisplayServer.is_touchscreen_available()`) handles `InputEventScreenTouch/Drag`
+  — drag to move the paddle, hold the corner button for the active power-up.
+  It converts touch `event.position` to world space with
+  `get_canvas_transform().affine_inverse() * pos` (the touch analogue of
+  `get_global_mouse_position()`), and feeds the paddle via `touch_move_to()` /
+  `touch_powerup_held`. Multitouch uses `event.index` so move + power-up work at once.
 - **Portrait mode**: arena.gd scales the polygon to fill the canvas width and
   stores `_arena_scale` (~2.1× on phone portrait). Every size/speed/force
   constant used in the arena must be multiplied by `_arena_scale` (balls take it
