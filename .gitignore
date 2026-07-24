@@ -16,3 +16,6 @@ mono_crash.*.json
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Godot Android Gradle build template (regenerate via Install Android Build Template)
+/android/

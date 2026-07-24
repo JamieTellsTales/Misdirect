@@ -12,7 +12,7 @@ config_version=5
 
 config/name="Misdirect"
 run/main_scene="res://scenes/main_menu.tscn"
-config/features=PackedStringArray("4.5", "Forward Plus")
+config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
 [autoload]
@@ -30,13 +30,6 @@ window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
-
-[layer_names]
-
-2d_physics/layer_1="walls"
-2d_physics/layer_2="balls"
-2d_physics/layer_3="paddles"
-2d_physics/layer_4="zones"
 
 [input]
 
@@ -70,6 +63,13 @@ power_up={
 ]
 }
 
+[layer_names]
+
+2d_physics/layer_1="walls"
+2d_physics/layer_2="balls"
+2d_physics/layer_3="paddles"
+2d_physics/layer_4="zones"
+
 [physics]
 
 2d/default_gravity=0.0
@@ -77,4 +77,5 @@ power_up={
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true
 anti_aliasing/quality/msaa_2d=1

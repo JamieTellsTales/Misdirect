@@ -80,6 +80,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not _rename_id.is_empty():
 		if event is InputEventKey and event.pressed:
 			if event.keycode == KEY_ESCAPE or event.physical_keycode == KEY_ESCAPE:
+				_hide_keyboard()
 				_rename_id = ""
 				_rename_text = ""
 				return
@@ -213,12 +214,24 @@ func _is_allowed_char(ch: String) -> bool:
 
 
 func _commit_rename() -> void:
+	_hide_keyboard()
 	var trimmed := _rename_text.strip_edges()
 	if trimmed.length() > 0:
 		ProfileManager.rename_profile(_rename_id, trimmed)
 		_load_stats_cache()
 	_rename_id = ""
 	_rename_text = ""
+
+
+func _show_keyboard() -> void:
+	if DisplayServer.has_feature(DisplayServer.FEATURE_VIRTUAL_KEYBOARD):
+		DisplayServer.virtual_keyboard_show(_rename_text, Rect2(),
+			DisplayServer.KEYBOARD_TYPE_DEFAULT, MAX_NAME)
+
+
+func _hide_keyboard() -> void:
+	if DisplayServer.has_feature(DisplayServer.FEATURE_VIRTUAL_KEYBOARD):
+		DisplayServer.virtual_keyboard_hide()
 
 
 func _update_hover(pos: Vector2) -> void:
@@ -282,6 +295,7 @@ func _handle_click(pos: Vector2) -> void:
 			_commit_rename()
 		elif _rename_cancel_rect.has_point(pos):
 			AudioManager.play_button_click()
+			_hide_keyboard()
 			_rename_id = ""
 			_rename_text = ""
 		return
@@ -311,6 +325,7 @@ func _handle_click(pos: Vector2) -> void:
 			_rename_text = p["name"]
 			_rename_cursor_visible = true
 			_rename_cursor_timer   = 0.0
+			_show_keyboard()
 			return
 
 		if not is_active:

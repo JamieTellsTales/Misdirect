@@ -16,6 +16,7 @@ var score_flash_timer: float = 0.0
 func _ready() -> void:
 	colour = ColourData.get_color(colour_type)
 	custom_minimum_size = Vector2(80, 35)
+	mouse_filter = Control.MOUSE_FILTER_IGNORE  # display only — never swallow touches
 	queue_redraw()
 
 
