@@ -15,6 +15,7 @@ var final_countdown: bool = false  # Set by arena when the Final Countdown modif
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(150, 40)
+	mouse_filter = Control.MOUSE_FILTER_IGNORE  # display only — never swallow touches
 	time_remaining = round_duration
 	queue_redraw()
 

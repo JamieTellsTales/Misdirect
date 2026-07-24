@@ -24,11 +24,17 @@ const ROW_H:       float = 44.0
 const SWATCH_SIZE: float = 30.0
 const SWATCH_GAP:  float = 7.0
 
-## Accessibility toggles shown below the colour grid.
-const TOGGLES: Array = [
-	{"label": "Reduced motion", "desc": "No screen shake, hit-stop, trails or flashing"},
-	{"label": "Ball symbols",   "desc": "A distinct shape per colour on balls & zones"},
-]
+## Accessibility rows shown below the colour grid. Two-state pills; the touch
+## controls row only appears on touch devices. Built dynamically so the layout
+## adapts.
+func _toggles() -> Array:
+	var out: Array = [
+		{"label": "Reduced motion", "desc": "No screen shake, hit-stop, trails or flashing", "off": "OFF", "on": "ON"},
+		{"label": "Ball symbols",   "desc": "A distinct shape per colour on balls & zones",  "off": "OFF", "on": "ON"},
+	]
+	if DisplayServer.is_touchscreen_available():
+		out.append({"label": "Touch controls", "desc": "How the paddle moves on a touchscreen", "off": "Joystick", "on": "Slide"})
+	return out
 
 var _swatch_rects: Array = []   # [{rect, ct, index}]  index -1 = Default
 var _toggle_rects: Array = []   # [{rect, idx}]
@@ -92,7 +98,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_handle_click(get_global_mouse_position())
 
-	var total: int = ZONE_ORDER.size() + TOGGLES.size()
+	var total: int = ZONE_ORDER.size() + _toggles().size()
 	if event.is_action_pressed("ui_cancel"):
 		_go_back()
 	elif event.is_action_pressed("ui_down") or event.is_action_pressed("move_down"):
@@ -116,14 +122,18 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _toggle_value(idx: int) -> bool:
-	return SettingsManager.reduced_motion if idx == 0 else SettingsManager.ball_symbols
+	match idx:
+		0: return SettingsManager.reduced_motion
+		1: return SettingsManager.ball_symbols
+		2: return SettingsManager.touch_scheme == "slide"
+	return false
 
 
 func _toggle_setting(idx: int) -> void:
-	if idx == 0:
-		SettingsManager.reduced_motion = not SettingsManager.reduced_motion
-	elif idx == 1:
-		SettingsManager.ball_symbols = not SettingsManager.ball_symbols
+	match idx:
+		0: SettingsManager.reduced_motion = not SettingsManager.reduced_motion
+		1: SettingsManager.ball_symbols = not SettingsManager.ball_symbols
+		2: SettingsManager.touch_scheme = "joystick" if SettingsManager.touch_scheme == "slide" else "slide"
 	SettingsManager.save_settings()
 	AudioManager.play_button_click()
 
@@ -291,24 +301,26 @@ func _draw() -> void:
 	draw_string(font, Vector2(swatch_x0 + 2.0, ROW_START_Y - 22.0), "default",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.5, 0.5, 0.6, 1.0))
 
-	# ── Accessibility toggles ─────────────────────────────────────────────────
+	# ── Accessibility / control rows ──────────────────────────────────────────
+	var toggles: Array = _toggles()
 	var tog_y0: float = ROW_START_Y + ZONE_ORDER.size() * ROW_H + 6.0
 	draw_line(Vector2(dot_x - 16.0, tog_y0 - 12.0), Vector2(cx + 470.0, tog_y0 - 12.0),
 		Color(0.3, 0.3, 0.4, 0.4), 1.0)
-	for ti in TOGGLES.size():
+	for ti in toggles.size():
+		var tog: Dictionary = toggles[ti]
 		var ty: float = tog_y0 + 14.0 + ti * ROW_H
 		var is_tsel: bool = _sel_row == ZONE_ORDER.size() + ti
 		if is_tsel:
 			draw_rect(Rect2(dot_x - 16.0, ty - ROW_H / 2.0 + 2.0, 970.0, ROW_H - 6.0),
 				Color(0.16, 0.18, 0.28, 0.7))
 		var on: bool = _toggle_value(ti)
-		draw_string(font, Vector2(label_x, ty - 2.0), TOGGLES[ti]["label"],
+		draw_string(font, Vector2(label_x, ty - 2.0), tog["label"],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Color(0.85, 0.9, 1.0, 1.0))
-		draw_string(font, Vector2(label_x, ty + 15.0), TOGGLES[ti]["desc"],
+		draw_string(font, Vector2(label_x, ty + 15.0), tog["desc"],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.5, 0.55, 0.65, 1.0))
 
-		# ON / OFF pill (right side, aligned with swatch block)
-		var pill_w: float = 108.0
+		# Two-state pill (right side, aligned with swatch block)
+		var pill_w: float = 130.0
 		var pill_h: float = 30.0
 		var pill_x: float = cx + 470.0 - pill_w
 		var pill_rect := Rect2(pill_x, ty - pill_h / 2.0, pill_w, pill_h)
@@ -321,15 +333,17 @@ func _draw() -> void:
 			draw_rect(Rect2(pill_x + half, ty - pill_h / 2.0, half, pill_h), Color(0.12, 0.5, 0.2, 0.9))
 		else:
 			draw_rect(Rect2(pill_x, ty - pill_h / 2.0, half, pill_h), Color(0.3, 0.3, 0.4, 0.5))
+		var off_lbl: String = tog["off"]
+		var on_lbl: String = tog["on"]
 		var off_col: Color = Color(0.9, 0.9, 1.0, 1.0) if not on else Color(0.45, 0.45, 0.55, 1.0)
 		var on_col: Color  = Color(0.9, 1.0, 0.9, 1.0) if on else Color(0.45, 0.45, 0.55, 1.0)
-		draw_string(font, Vector2(pill_x + (half - font.get_string_size("OFF", HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x) / 2.0, ty + 5.0),
-			"OFF", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, off_col)
-		draw_string(font, Vector2(pill_x + half + (half - font.get_string_size("ON", HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x) / 2.0, ty + 5.0),
-			"ON", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, on_col)
+		draw_string(font, Vector2(pill_x + (half - font.get_string_size(off_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x) / 2.0, ty + 5.0),
+			off_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, off_col)
+		draw_string(font, Vector2(pill_x + half + (half - font.get_string_size(on_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x) / 2.0, ty + 5.0),
+			on_lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, on_col)
 
 	# Buttons: Reset (left), Back (centre)
-	var btn_y: float = tog_y0 + 14.0 + TOGGLES.size() * ROW_H + 8.0
+	var btn_y: float = tog_y0 + 14.0 + toggles.size() * ROW_H + 8.0
 
 	var reset_lbl := "Reset to defaults"
 	var rsz: int = 16

@@ -36,6 +36,20 @@ func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	# Show a back button when there is already at least one profile
 	show_back = not ProfileManager.profiles.is_empty()
+	# On touch devices (no physical keyboard), pop the OS keyboard automatically.
+	# Its key events flow through _handle_key like a normal keyboard.
+	_show_keyboard()
+
+
+func _show_keyboard() -> void:
+	if DisplayServer.has_feature(DisplayServer.FEATURE_VIRTUAL_KEYBOARD):
+		DisplayServer.virtual_keyboard_show(name_text, _name_box_rect,
+			DisplayServer.KEYBOARD_TYPE_DEFAULT, MAX_NAME)
+
+
+func _hide_keyboard() -> void:
+	if DisplayServer.has_feature(DisplayServer.FEATURE_VIRTUAL_KEYBOARD):
+		DisplayServer.virtual_keyboard_hide()
 
 
 func _process(delta: float) -> void:
@@ -85,7 +99,11 @@ func _handle_click(pos: Vector2) -> void:
 		_open_settings()
 	elif show_back and _back_rect.has_point(pos):
 		AudioManager.play_button_click()
+		_hide_keyboard()
 		get_tree().change_scene_to_file("res://scenes/profile_select.tscn")
+	elif _name_box_rect.has_point(pos):
+		# Tapping the field re-opens the on-screen keyboard if it was dismissed.
+		_show_keyboard()
 
 
 func _handle_key(event: InputEventKey) -> void:
@@ -102,6 +120,7 @@ func _handle_key(event: InputEventKey) -> void:
 		return
 
 	if event.keycode == KEY_ESCAPE and show_back:
+		_hide_keyboard()
 		get_tree().change_scene_to_file("res://scenes/profile_select.tscn")
 		return
 
@@ -128,6 +147,7 @@ func _name_is_valid() -> bool:
 
 
 func _create_profile() -> void:
+	_hide_keyboard()
 	var trimmed: String = name_text.strip_edges()
 	ProfileManager.create_profile(trimmed)
 	StatsManager.load_stats()   # Reload for the new profile
@@ -148,6 +168,7 @@ func _create_profile() -> void:
 
 
 func _open_settings() -> void:
+	_hide_keyboard()
 	_settings_overlay = _settings_scene.instantiate()
 	_settings_overlay.return_to_game = true   # Emit done signal instead of scene-changing
 	_settings_overlay.done.connect(_on_settings_done)
@@ -156,6 +177,7 @@ func _open_settings() -> void:
 
 func _on_settings_done() -> void:
 	_settings_overlay = null   # Node freed itself via queue_free()
+	_show_keyboard()
 
 
 # ── Drawing ──────────────────────────────────────────────────────────────────

@@ -12,21 +12,28 @@ var gravity_active:      bool = false
 var antigravity_active:  bool = false
 var cyclone_active:      bool = false
 
-# Touch control (set by TouchControls). The paddle tracks a finger's position
-# and its active power-up can be held via the on-screen button.
-const TOUCH_FOLLOW_MULT: float = 2.6   # how much faster than move_speed touch tracks
+# Touch control (set by TouchControls). Two schemes:
+#   • buttons — touch_dir is -1 / 0 / +1 (hold left/right), moves like the keyboard.
+#   • slide   — touch_offset_active + a target offset the paddle snaps to (1:1 pad).
 var touch_powerup_held: bool = false
-var _touch_move_active: bool = false
-var _touch_world_pos:   Vector2 = Vector2.ZERO
+var touch_dir: float = 0.0
+var _touch_offset_active: bool = false
+var _touch_offset_target: float = 0.0
 
 
-func touch_move_to(world_pos: Vector2) -> void:
-	_touch_move_active = true
-	_touch_world_pos = world_pos
+func touch_set_dir(d: float) -> void:
+	touch_dir = clampf(d, -1.0, 1.0)
 
 
-func touch_move_end() -> void:
-	_touch_move_active = false
+func touch_set_fraction(f: float) -> void:
+	## Absolute slide pad: 0 = full left, 1 = full right.
+	_touch_offset_active = true
+	_touch_offset_target = lerpf(min_offset, max_offset, clampf(f, 0.0, 1.0))
+
+
+func touch_clear() -> void:
+	touch_dir = 0.0
+	_touch_offset_active = false
 
 
 func _ready() -> void:
@@ -38,14 +45,19 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if _touch_move_active:
-		_track_touch(delta)
+	if _touch_offset_active:
+		# Slide pad — snap to the target offset (1:1), with a capped velocity for
+		# the ball's deflection blend.
+		var cur: float = get_slide_offset()
+		var raw_v: float = (_touch_offset_target - cur) / maxf(delta, 0.0001)
+		var maxv: float = move_speed * 3.0 * arena_scale
+		velocity = move_direction * clampf(raw_v, -maxv, maxv)
+		set_slide_offset(_touch_offset_target)
 	else:
-		var input_dir := _get_input_direction()
-		# Physics velocity so the CharacterBody2D velocity is correct for deflection.
+		# Keyboard, or the touch left/right buttons (touch_dir).
+		var input_dir: float = touch_dir if touch_dir != 0.0 else _get_input_direction()
 		velocity = move_direction * input_dir * move_speed * arena_scale
 		move_and_slide()
-		# Snap back onto the constrained axis (move_and_slide can drift).
 		set_slide_offset(get_slide_offset())
 
 	# Hold-activated power-ups: keyboard key OR the on-screen touch button.
@@ -60,18 +72,6 @@ func _physics_process(delta: float) -> void:
 	if cyclone_active:
 		_apply_cyclone()
 	queue_redraw()
-
-
-func _track_touch(delta: float) -> void:
-	## Move toward the touched position along the slide axis, capped so a fast
-	## drag stays responsive without teleporting. Velocity is kept accurate for
-	## the ball's deflection blend.
-	var target: float = clampf((_touch_world_pos - zone_centre).dot(move_direction), min_offset, max_offset)
-	var cur: float = get_slide_offset()
-	var max_step: float = move_speed * TOUCH_FOLLOW_MULT * arena_scale * delta
-	var step: float = clampf(target - cur, -max_step, max_step)
-	velocity = move_direction * (step / maxf(delta, 0.0001))
-	set_slide_offset(cur + step)
 
 
 func _is_powerup_held(pu_id: String) -> bool:

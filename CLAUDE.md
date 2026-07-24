@@ -4,19 +4,19 @@
 
 **Godot Executable Path (IMPORTANT - use this exact path):**
 ```
-C:\Users\jamie\OneDrive - Blakeman Online\Desktop\Godot\Godot_v4.5.1-stable_win64.exe
+C:\Users\jamie\Documents\Repos\Godot\Godot_v4.7-stable_win64.exe
 ```
 
 To run the game:
 ```bash
-"C:\Users\jamie\OneDrive - Blakeman Online\Desktop\Godot\Godot_v4.5.1-stable_win64.exe" --path "C:\Users\jamie\Documents\Repos\Misdirect"
+"C:\Users\jamie\Documents\Repos\Godot\Godot_v4.7-stable_win64.exe" --path "C:\Users\jamie\Documents\Repos\Misdirect"
 ```
 
 ## Project Overview
 
 - **Game**: Misdirect - an arcade game of skill and misdirection
 - **Repository**: https://github.com/JamieTellsTales/Misdirect
-- **Engine Version**: Godot 4.5.1
+- **Engine Version**: Godot 4.7
 - **Primary Language**: GDScript
 - **Project Type**: 2D
 - **Target Platforms**: Windows (initial), Steam + Android (post-prototype)
@@ -147,15 +147,15 @@ scripts/
 ### Running & Testing
 ```bash
 # Run the game
-"C:\Users\jamie\OneDrive - Blakeman Online\Desktop\Godot\Godot_v4.5.1-stable_win64.exe" --path .
+"C:\Users\jamie\Documents\Repos\Godot\Godot_v4.7-stable_win64.exe" --path .
 
 # Validate a script (NOTE: autoload references produce FALSE-POSITIVE
 # "Identifier not found" errors under --check-only — ignore those; only
 # genuine syntax/indentation errors matter)
-"C:\Users\jamie\OneDrive - Blakeman Online\Desktop\Godot\Godot_v4.5.1-stable_win64.exe" --path . --check-only --script scripts/example.gd
+"C:\Users\jamie\Documents\Repos\Godot\Godot_v4.7-stable_win64.exe" --path . --check-only --script scripts/example.gd
 
 # Debug collisions
-"C:\Users\jamie\OneDrive - Blakeman Online\Desktop\Godot\Godot_v4.5.1-stable_win64.exe" --path . --debug-collisions
+"C:\Users\jamie\Documents\Repos\Godot\Godot_v4.7-stable_win64.exe" --path . --debug-collisions
 ```
 
 ### Git Workflow

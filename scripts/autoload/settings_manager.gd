@@ -55,6 +55,7 @@ var zone_colours: Dictionary = {}
 # Accessibility toggles.
 var reduced_motion: bool = false  # Disable shake / hit-stop / trails / flashing
 var ball_symbols: bool = false    # Draw a distinct symbol per colour on balls & zones
+var touch_scheme: String = "joystick"  # Touch control layout: "joystick" or "slide"
 
 
 func _ready() -> void:
@@ -81,6 +82,7 @@ func load_settings() -> void:
 	zone_colours     = config.get_value("colours", "zone_colours",      {})
 	reduced_motion   = config.get_value("accessibility", "reduced_motion", false)
 	ball_symbols     = config.get_value("accessibility", "ball_symbols",   false)
+	touch_scheme     = config.get_value("accessibility", "touch_scheme",   "joystick")
 
 
 func save_settings() -> void:
@@ -95,6 +97,7 @@ func save_settings() -> void:
 	config.set_value("colours", "zone_colours",     zone_colours)
 	config.set_value("accessibility", "reduced_motion", reduced_motion)
 	config.set_value("accessibility", "ball_symbols",   ball_symbols)
+	config.set_value("accessibility", "touch_scheme",   touch_scheme)
 	config.save(CONFIG_PATH)
 
 
