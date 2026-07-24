@@ -113,6 +113,11 @@ func _apply_display() -> void:
 	var vsync_mode := DisplayServer.VSYNC_ENABLED if vsync else DisplayServer.VSYNC_DISABLED
 	DisplayServer.window_set_vsync_mode(vsync_mode)
 
+	# Mobile is always immersive fullscreen — there's no meaningful windowed mode.
+	if OS.get_name() == "Android" or OS.get_name() == "iOS":
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+		return
+
 	# Fullscreen / windowed
 	if fullscreen:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)

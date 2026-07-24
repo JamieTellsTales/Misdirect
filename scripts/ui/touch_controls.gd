@@ -137,13 +137,15 @@ func _on_release(index: int) -> void:
 
 func _apply_joy() -> void:
 	var vp: Vector2 = get_viewport_rect().size
-	# Short throw: full speed with only a small push, so it doesn't feel sluggish.
 	_joy_max = minf(vp.x, vp.y) * 0.085
-	var frac: float = clampf((_joy_knob.x - _joy_base.x) / _joy_max, -1.0, 1.0)
+	# Digital: any push past the dead zone = full speed in that direction.
+	var dx: float = _joy_knob.x - _joy_base.x
+	var dead: float = _joy_max * 0.18
 	var dir: float = 0.0
-	if absf(frac) >= 0.1:      # dead zone
-		# Ease-out curve — ramps toward full speed quickly.
-		dir = signf(frac) * pow(absf(frac), 0.6)
+	if dx > dead:
+		dir = 1.0
+	elif dx < -dead:
+		dir = -1.0
 	if _paddle_valid():
 		paddle.touch_set_dir(dir)
 

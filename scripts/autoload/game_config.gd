@@ -239,6 +239,21 @@ const MAP_VALID_PLAYERS: Dictionary = {
 }
 
 
+func _notification(what: int) -> void:
+	# Android back button: route it to ui_cancel so each screen's own back /
+	# pause / confirm-quit handler fires (project.godot disables the default
+	# quit-on-go-back so this is the single point of control).
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		var press := InputEventAction.new()
+		press.action = "ui_cancel"
+		press.pressed = true
+		Input.parse_input_event(press)
+		var release := InputEventAction.new()
+		release.action = "ui_cancel"
+		release.pressed = false
+		Input.parse_input_event(release)
+
+
 func reset() -> void:
 	selected_power_up = ""
 	power_up_slots = ["", "", ""]
