@@ -21,6 +21,11 @@ var xp_earned: int = 0
 var level_before: int = 0
 var level_after: int = 0
 
+# Tappable action buttons (also keyboard-accessible)
+var _again_rect: Rect2 = Rect2()
+var _menu_rect:  Rect2 = Rect2()
+var _over_hover: String = ""
+
 # XP bar animation
 var _xp_anim_from:  float = 0.0   # total XP at start of game
 var _xp_anim_to:    float = 0.0   # total XP at end of game
@@ -62,14 +67,36 @@ func _input(event: InputEvent) -> void:
 	if not visible:
 		return
 
+	if event is InputEventMouseMotion:
+		var mp := get_global_mouse_position()
+		_over_hover = "again" if _again_rect.has_point(mp) else ("menu" if _menu_rect.has_point(mp) else "")
+		return
+
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		var mp := get_global_mouse_position()
+		if _again_rect.has_point(mp):
+			_play_again()
+			return
+		if _menu_rect.has_point(mp):
+			_to_menu()
+			return
+
 	if event.is_action_pressed("ui_accept"):
-		AudioManager.play_button_click()
-		get_tree().paused = false
-		restart_requested.emit()
+		_play_again()
 	elif event.is_action_pressed("ui_cancel"):
-		AudioManager.play_button_click()
-		get_tree().paused = false
-		quit_requested.emit()
+		_to_menu()
+
+
+func _play_again() -> void:
+	AudioManager.play_button_click()
+	get_tree().paused = false
+	restart_requested.emit()
+
+
+func _to_menu() -> void:
+	AudioManager.play_button_click()
+	get_tree().paused = false
+	quit_requested.emit()
 
 
 func show_results(
@@ -152,9 +179,9 @@ func _draw() -> void:
 
 	# Box width: just wide enough for the instructions line + 24 px padding each side.
 	var inst_size: int = 15
-	var inst_text: String = "ENTER — play again     ESC — main menu"
+	var inst_text: String = "Enter — play again     Esc — main menu"
 	var inst_text_w := font.get_string_size(inst_text, HORIZONTAL_ALIGNMENT_LEFT, -1, inst_size).x
-	var box_w: float = inst_text_w + 48.0
+	var box_w: float = maxf(inst_text_w + 48.0, 460.0)
 
 	# Height grows with the number of score rows so all colours always fit.
 	var n: int = final_scores.size()
@@ -174,7 +201,7 @@ func _draw() -> void:
 	if newly_unlocked.size() > 0:
 		box_h += 8.0                          # gap before section
 		box_h += float(newly_unlocked.size()) * 22.0
-	box_h += 50.0                       # gap before instructions + instructions area
+	box_h += 84.0                       # gap + action buttons + keyboard hint
 	var box_x: float = center_x - box_w / 2.0
 	var box_y: float = center_y - box_h / 2.0
 	var box_rect := Rect2(box_x, box_y, box_w, box_h)
@@ -327,12 +354,33 @@ func _draw() -> void:
 				ul_text, HORIZONTAL_ALIGNMENT_LEFT, -1, unlock_sz, Color(0.85, 0.55, 1.0, 1.0))
 			extra_y += 22.0
 
-	# ── Instructions ─────────────────────────────────────────────────────────
-	var inst_w: float = inst_text_w  # already measured above for box_w
-	draw_string(font, Vector2(center_x - inst_w / 2.0, box_y + box_h - 20.0),
-		inst_text, HORIZONTAL_ALIGNMENT_LEFT, -1, inst_size, Color(0.45, 0.45, 0.55, 1.0))
+	# ── Action buttons (tappable) + keyboard hint ────────────────────────────
+	var btn_w: float = 190.0
+	var btn_h: float = 46.0
+	var btn_gap: float = 20.0
+	var btns_y: float = box_y + box_h - btn_h - 26.0
+	_again_rect = Rect2(center_x - btn_w - btn_gap / 2.0, btns_y, btn_w, btn_h)
+	_menu_rect  = Rect2(center_x + btn_gap / 2.0, btns_y, btn_w, btn_h)
+	_draw_action_button(font, _again_rect, "PLAY AGAIN", _over_hover == "again",
+		Color(0.12, 0.42, 0.16, 1.0), Color(0.3, 0.9, 0.4, 0.9), Color.WHITE)
+	_draw_action_button(font, _menu_rect, "MAIN MENU", _over_hover == "menu",
+		Color(0.18, 0.18, 0.26, 1.0), Color(0.5, 0.5, 0.65, 0.8), Color(0.8, 0.8, 0.9, 1.0))
+
+	draw_string(font, Vector2(center_x - inst_text_w / 2.0, box_y + box_h - 10.0),
+		inst_text, HORIZONTAL_ALIGNMENT_LEFT, -1, inst_size, Color(0.4, 0.4, 0.5, 0.9))
 
 	CornerHUD.draw_on(self)
+
+
+func _draw_action_button(font: Font, rect: Rect2, label: String, hovered: bool,
+		bg: Color, border: Color, text_col: Color) -> void:
+	var fill := bg.lightened(0.12) if hovered else bg
+	draw_rect(rect, fill)
+	draw_rect(rect, border, false, 2.0)
+	var lsz: int = 20
+	var lw := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, lsz).x
+	draw_string(font, Vector2(rect.position.x + (rect.size.x - lw) / 2.0, rect.position.y + 30.0),
+		label, HORIZONTAL_ALIGNMENT_LEFT, -1, lsz, text_col)
 
 
 func hide_screen() -> void:

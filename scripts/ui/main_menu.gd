@@ -19,6 +19,12 @@ var selected_index: int = 0
 var popup_state: int = 0  # 0 = none, 5 = achievements (index into MENU_ITEMS)
 var _prev_selected_index: int = -1
 
+# Quit confirmation (shown on back / EXIT)
+var _confirm_quit: bool = false
+var _quit_yes_rect: Rect2 = Rect2()
+var _quit_no_rect:  Rect2 = Rect2()
+var _quit_hover: String = ""
+
 var title_pulse: float = 0.0
 var item_rects: Array = []  # Rect2 per menu item for mouse hit-testing
 
@@ -42,6 +48,20 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _confirm_quit:
+		if event is InputEventMouseMotion:
+			var qp := get_global_mouse_position()
+			_quit_hover = "yes" if _quit_yes_rect.has_point(qp) else ("no" if _quit_no_rect.has_point(qp) else "")
+		elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			var qp := get_global_mouse_position()
+			if _quit_yes_rect.has_point(qp):
+				get_tree().quit()
+			elif _quit_no_rect.has_point(qp):
+				_confirm_quit = false
+		elif event.is_action_pressed("ui_cancel"):
+			_confirm_quit = false
+		return
+
 	if popup_state != 0:
 		if event.is_action_pressed("ui_cancel"):
 			popup_state = 0
@@ -61,6 +81,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event.is_action_pressed("ui_accept"):
 		_activate(selected_index)
+
+	if event.is_action_pressed("ui_cancel"):
+		_confirm_quit = true
+		_quit_hover = ""
 
 
 func _update_hover(pos: Vector2) -> void:
@@ -100,7 +124,8 @@ func _activate(index: int) -> void:
 		5:
 			popup_state = 5
 		6:
-			get_tree().quit()
+			_confirm_quit = true
+			_quit_hover = ""
 
 
 func _draw() -> void:
@@ -110,7 +135,52 @@ func _draw() -> void:
 	_draw_profile_badge()
 	if popup_state != 0:
 		_draw_popup()
+	if _confirm_quit:
+		_draw_quit_confirm()
 	CornerHUD.draw_on(self)
+
+
+func _draw_quit_confirm() -> void:
+	var font := FontManager.get_font()
+	var sw: float = get_viewport_rect().size.x
+	var sh: float = get_viewport_rect().size.y
+	var cx: float = sw / 2.0
+	var cy: float = sh / 2.0
+
+	draw_rect(Rect2(Vector2.ZERO, Vector2(sw, sh)), Color(0, 0, 0, 0.65))
+
+	var box_w: float = 440.0
+	var box_h: float = 180.0
+	var bx: float = cx - box_w / 2.0
+	var by: float = cy - box_h / 2.0
+	draw_rect(Rect2(bx, by, box_w, box_h), Color(0.09, 0.09, 0.15, 0.98))
+	draw_rect(Rect2(bx, by, box_w, box_h), Color(0.55, 0.55, 0.68, 1.0), false, 2.0)
+
+	var q := "Quit Misdirect?"
+	var qsz: int = 26
+	var qw := font.get_string_size(q, HORIZONTAL_ALIGNMENT_LEFT, -1, qsz).x
+	draw_string(font, Vector2(cx - qw / 2.0, by + 56.0), q, HORIZONTAL_ALIGNMENT_LEFT, -1, qsz, Color.WHITE)
+
+	var btn_w: float = 150.0
+	var btn_h: float = 48.0
+	var gap: float = 24.0
+	var btn_y: float = by + box_h - btn_h - 22.0
+	_quit_yes_rect = Rect2(cx - btn_w - gap / 2.0, btn_y, btn_w, btn_h)
+	_quit_no_rect  = Rect2(cx + gap / 2.0, btn_y, btn_w, btn_h)
+
+	var yes_hov: bool = _quit_hover == "yes"
+	draw_rect(_quit_yes_rect, Color(0.5, 0.15, 0.15, 1.0) if yes_hov else Color(0.36, 0.12, 0.12, 1.0))
+	draw_rect(_quit_yes_rect, Color(0.9, 0.4, 0.4, 0.9), false, 2.0)
+	var yl := "QUIT"
+	var ylw := font.get_string_size(yl, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x
+	draw_string(font, Vector2(_quit_yes_rect.position.x + (btn_w - ylw) / 2.0, btn_y + 31.0), yl, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color.WHITE)
+
+	var no_hov: bool = _quit_hover == "no"
+	draw_rect(_quit_no_rect, Color(0.2, 0.3, 0.22, 1.0) if no_hov else Color(0.14, 0.22, 0.16, 1.0))
+	draw_rect(_quit_no_rect, Color(0.4, 0.8, 0.45, 0.9), false, 2.0)
+	var nl := "CANCEL"
+	var nlw := font.get_string_size(nl, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x
+	draw_string(font, Vector2(_quit_no_rect.position.x + (btn_w - nlw) / 2.0, btn_y + 31.0), nl, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.85, 1.0, 0.88, 1.0))
 
 
 func _draw_background() -> void:
